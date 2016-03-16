@@ -1,0 +1,6 @@
+SYNCERBASE="/systemsync"
+SYNCREPO="/systemsync/repo"
+GITURL="https://localhost/systemsync.git"
+GITBRANCH="master"
+GITUSER="user"
+GITEMAIL="user@localhost"
