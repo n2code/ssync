@@ -98,7 +98,6 @@ elif [[ "$1" == "add" ]]; then
 				&& chmod --reference="$TARGET" --changes "$PASSED" \
 				&& STATUS="$SUCCESSMESSAGE"
 EOS
-
 			eval "$RUNNER"
 		fi
 
@@ -108,6 +107,20 @@ EOS
 	echo "####################"
 	echo "$STATUS"
 	echo "$PASSED -> $TARGET"
+
+elif [[ "$1" == "commit" ]]; then
+	shift
+
+	cd "$SYNCREPO"
+	git preserve-permissions --save
+	git add --all
+
+	MSG="System update: $( git diff --staged --stat | tail -n1 )"
+	if [[ "$1" != "" ]]; then
+		MSG="$1"
+	fi
+
+	git commit -m "$MSG"
 
 else
 	usagehelp
