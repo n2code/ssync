@@ -66,7 +66,7 @@ elif [[ "$1" == "add" ]]; then
 	fi
 
 	PASSED=$1
-	TARGET=$SYNCREPO$PASSED
+	TARGET="$SYNCREPO/files$PASSED"
 
 	if [[ $PASSED != /* || $PASSED == */ ]]; then
 		echo "Absolute path without trailing slash required!" 1>&2
@@ -74,34 +74,36 @@ elif [[ "$1" == "add" ]]; then
 	fi
 
 	STATUS="ERROR, command failed on request:"
-	if [[ -e $PASSED ]]; then
-		if [[ -d $PASSED ]]; then
-			if [[ $OPTION == "nolink" ]]; then
+	if [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
+		if [[ $OPTION == "nolink" ]]; then
+			if [[ -d $PASSED ]]; then
 				rsync --dirs --links --perms --times --group --owner "$PASSED/" "$TARGET" \
 				&& STATUS="Directory added without link:"
 			else
-				rsync --recursive --links --perms --times --group --owner --devices --specials --verbose "$PASSED/" "$TARGET" \
+				STATUS="ERROR, no directory:"
+			fi
+		else
+			if [[ -d $PASSED ]]; then
+				SUCCESSMESSAGE="Directory sync added:"
+			elif [[ -f $PASSED ]]; then
+				SUCCESSMESSAGE="File sync added:"
+			fi
+
+			read -d '' RUNNER <<"EOS"
+				rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
 				&& rm --recursive --verbose $PASSED \
 				&& echo "Relinking former location..." \
 				&& ln --symbolic "$TARGET" "$PASSED" \
-				&& chown --no-dereference --reference="$TARGET" --changes "$PASSED" \
+				&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
 				&& chmod --reference="$TARGET" --changes "$PASSED" \
-				&& STATUS="Directory sync added:"
-			fi
-		elif [[ -f $PASSED ]]; then
-			rsync --links --perms --times --group --owner --devices --specials --verbose "$PASSED" "$TARGET" \
-			&& rm --verbose $PASSED \
-			&& echo "Relinking former location..." \
-			&& ln --symbolic "$TARGET" "$PASSED" \
-			&& chown --no-dereference --reference="$TARGET" --changes "$PASSED" \
-			&& chmod --reference="$TARGET" --changes "$PASSED" \
-			&& STATUS="File sync added:"
-			STATUS="File sync added:"
-		else
-			STATUS="ERROR, no directory or file:"
+				&& STATUS="$SUCCESSMESSAGE"
+EOS
+
+			eval "$RUNNER"
 		fi
+
 	else
-		STATUS="ERROR, does not exist:"
+		STATUS="ERROR, directory or file not found:"
 	fi
 	echo "####################"
 	echo "$STATUS"
