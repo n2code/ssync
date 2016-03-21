@@ -74,7 +74,9 @@ elif [[ "$1" == "add" ]]; then
 	fi
 
 	STATUS="ERROR, command failed on request:"
-	if [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
+	if [[ -e $PASSED && -e $TARGET ]]; then
+		STATUS="ERROR, already in repository:"
+	elif [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
 		if [[ $OPTION == "nolink" ]]; then
 			if [[ -d $PASSED ]]; then
 				rsync --dirs --links --perms --times --group --owner "$PASSED/" "$TARGET" \
