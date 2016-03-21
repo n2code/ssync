@@ -108,6 +108,30 @@ EOS
 	echo "$STATUS"
 	echo "$PASSED -> $TARGET"
 
+elif [[ "$1" == "remove" ]]; then
+	shift
+
+	PASSED=$1
+	REPODATA="$SYNCREPO/files$PASSED"
+
+	if [[ $PASSED != /* || $PASSED == */ ]]; then
+		echo "Absolute path without trailing slash required!" 1>&2
+		exit 1
+	fi
+
+	STATUS="ERROR, command failed on request:"
+	if [[ -L $PASSED && -e $REPODATA ]]; then
+		rm --verbose "$PASSED" \
+		&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$REPODATA/" "/" \
+		&& STATUS="Restored at original location:"
+	else
+		STATUS="ERROR, no link encountered:"
+	fi
+	echo "####################"
+	echo "$STATUS"
+	echo "$PASSED <- $REPODATA"
+
+
 elif [[ "$1" == "commit" ]]; then
 	shift
 
