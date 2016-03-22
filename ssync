@@ -9,7 +9,7 @@ fi
 
 function usagehelp () {
 	echo "USAGE: ssync setup"
-	echo "       ssync [verbose] [nolink] add /path/to/unversioned/file"
+	echo "       ssync [verbose] add /path/to/unversioned/file"
 	echo "       ssync [verbose] remove /path/to/versioned/file"
 	echo "       ssync [verbose] commit"
 }
@@ -56,6 +56,7 @@ if [[ "$1" == "setup" ]]; then
 	git config preserve-permissions.user true
 	git config preserve-permissions.group true
 	git config preserve-permissions.perms 0777
+	git config preserve-permissions.file "file-permissions"
 	git config user.name "$GITUSER"
 	git config user.email "$GITEMAIL"
 	git config push.default matching
@@ -68,12 +69,6 @@ if [[ "$1" == "setup" ]]; then
 elif [[ "$1" == "add" ]]; then
 	shift
 
-	OPTION=""
-	if [[ $1 == "nolink" ]]; then
-		OPTION="nolink"
-		shift
-	fi
-
 	PASSED=$1
 	TARGET="$SYNCREPO/files$PASSED"
 
@@ -85,28 +80,19 @@ elif [[ "$1" == "add" ]]; then
 	if [[ -e $PASSED && -e $TARGET ]]; then
 		echo "ERROR, already in repository $SYNCREPO" 1>&2
 	elif [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
-		if [[ $OPTION == "nolink" ]]; then
-			if [[ -d $PASSED ]]; then
-				OUTPUT=$( rsync --dirs --links --perms --times --group --owner "$PASSED/" "$TARGET" > /dev/null \
-				&& echo "Directory added without link: $PASSED -> $TARGET" )
-			else
-				echo "ERROR, no directory: $PASSED" 1>&2
-			fi
-		else
-			if [[ -d $PASSED ]]; then
-				SUCCESSMESSAGE="Directory sync added."
-			elif [[ -f $PASSED ]]; then
-				SUCCESSMESSAGE="File sync added."
-			fi
-
-			OUTPUT=$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
-				&& rm --recursive --verbose $PASSED \
-				&& echo "Relinking former location..." \
-				&& ln --symbolic "$TARGET" "$PASSED" \
-				&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
-				&& chmod --reference="$TARGET" --changes "$PASSED" \
-				&& echo "$SUCCESSMESSAGE" )
+		if [[ -d $PASSED ]]; then
+			SUCCESSMESSAGE="Directory sync added."
+		elif [[ -f $PASSED ]]; then
+			SUCCESSMESSAGE="File sync added."
 		fi
+
+		OUTPUT=$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
+			&& rm --recursive --verbose $PASSED \
+			&& echo "Relinking former location..." \
+			&& ln --symbolic "$TARGET" "$PASSED" \
+			&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
+			&& chmod --reference="$TARGET" --changes "$PASSED" \
+			&& echo "$SUCCESSMESSAGE" )
 	else
 		echo "ERROR, directory or file not found: $PASSED" 1>&2
 	fi
@@ -143,13 +129,13 @@ elif [[ "$1" == "commit" ]]; then
 
 	OUTPUT=$(
 		cd "$SYNCREPO"
-		git preserve-permissions --check --verbose
-		git preserve-permissions --save
 		git add --all
+		git preserve-permissions --save --verbose
+		git add "file-permissions"
+		git preserve-permissions --save
+
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
-		if [[ "$1" != "" ]]; then
-			MSG="$1"
-		fi
+		if [[ "$1" != "" ]]; then MSG="$1"; fi
 		git commit -m "$MSG"
 	)
 
