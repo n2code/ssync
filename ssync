@@ -9,7 +9,9 @@ fi
 
 function usagehelp () {
 	echo "USAGE: ssync setup"
-	echo "       ssync add /path/to/unversioned/file"
+	echo "       ssync [verbose] [nolink] add /path/to/unversioned/file"
+	echo "       ssync [verbose] remove /path/to/versioned/file"
+	echo "       ssync [verbose] commit"
 }
 
 if [[ ! -f "settings.inc" ]]; then
@@ -25,6 +27,7 @@ if [[ "$1" == "verbose" ]]; then
 	shift
 	VERBOSE="yes"
 fi
+
 
 if [[ "$1" == "setup" ]]; then
 	echo "SYSTEMSYNC-SETUP"
@@ -60,6 +63,7 @@ if [[ "$1" == "setup" ]]; then
 
 	echo "################"
 	echo "Setup complete."
+
 
 elif [[ "$1" == "add" ]]; then
 	shift
@@ -137,22 +141,23 @@ elif [[ "$1" == "remove" ]]; then
 elif [[ "$1" == "commit" ]]; then
 	shift
 
-	cd "$SYNCREPO"
-	git preserve-permissions --check --verbose
-	git preserve-permissions --save
-	git add --all
-
-	MSG="System update: $( git diff --staged --stat | tail -n1 )"
-	if [[ "$1" != "" ]]; then
-		MSG="$1"
-	fi
-
-	git commit -m "$MSG"
+	OUTPUT=$(
+		cd "$SYNCREPO"
+		git preserve-permissions --check --verbose
+		git preserve-permissions --save
+		git add --all
+		MSG="System update: $( git diff --staged --stat | tail -n1 )"
+		if [[ "$1" != "" ]]; then
+			MSG="$1"
+		fi
+		git commit -m "$MSG"
+	)
 
 
 else
 	usagehelp
 fi
+
 
 if [[ "$VERBOSE" == "yes" ]]; then
 	echo "$OUTPUT"
