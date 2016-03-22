@@ -27,6 +27,7 @@ fi
 source "$DIR/settings.inc"
 PERMFILE="file-permissions"
 INDEXFILE="ssync-index"
+PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 
 if [[ "$1" == "verbose" ]]; then
 	shift
@@ -60,19 +61,20 @@ if [[ "$1" == "setup" ]]; then
 
 	echo "Cloning permission saver..."
 	cd "$DIR"
-	git clone https://github.com/dr4Ke/git-preserve-permissions git-preserve-permissions
+	if ! git clone https://github.com/dr4Ke/git-preserve-permissions "git-preserve-permissions"; then
+		errecho "CLONE FAILED." && exit 1
+	fi
 
 	echo "Checking out tested revision..."
 	cd git-preserve-permissions
 	if ! git checkout -f 8bb161714cdc148214928e0115fd50fc407f0922; then
-		echo "CHECKOUT FAILED." && exit 1
+		errecho "CHECKOUT FAILED." && exit 1
 	fi
 
-	echo "Linking preserve-permissions..."
-	ln -s "${DIR}/git-preserve-permissions/git-preserve-permissions" "/usr/local/bin/git-preserve-permissions"
-
 	echo "Cloning system config repo..."
-	git clone "$GITURL" "$SYNCREPO"
+	if ! git clone "$GITURL" "$SYNCREPO"; then
+		errecho "CLONE FAILED." && exit 1
+	fi
 
 	echo "Installing hook(s)..."
 	cp post-checkout "$SYNCREPO/.git/hooks/"
@@ -155,9 +157,9 @@ elif [[ "$1" == "commit" ]]; then
 	OUTPUT=$(
 		cd "$SYNCREPO"
 		git add --all
-		git preserve-permissions --save --verbose
+		$PERMSCRIPT --save --verbose
 		git add "$PERMFILE"
-		git preserve-permissions --save
+		$PERMSCRIPT --save
 
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
 		if [[ "$1" != "" ]]; then MSG="$1"; fi
