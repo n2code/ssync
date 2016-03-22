@@ -120,12 +120,17 @@ elif [[ "$1" == "remove" ]]; then
 	fi
 
 	STATUS="ERROR, command failed on request:"
-	if [[ -L $PASSED && -e $REPODATA ]]; then
-		OUTPUT=$( rm --verbose "$PASSED" \
-			&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$REPODATA/" "/" \
-			&& STATUS="Restored at original location." )
+	if [[ -L $PASSED ]]; then
+		if [[ -e $REPODATA ]]; then
+			OUTPUT=$( rm --verbose "$PASSED" \
+				&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
+				&& rm -r --verbose "$REPODATA" \
+				&& echo "Restored at original location." )
+		else
+			echo "ERROR, is a symlink but not in repo: $PASSED" 1>&2
+		fi
 	else
-		STATUS="ERROR, no link encountered: $PASSED"
+		echo "ERROR, no symlink: $PASSED" 1>&2
 	fi
 
 
@@ -133,6 +138,7 @@ elif [[ "$1" == "commit" ]]; then
 	shift
 
 	cd "$SYNCREPO"
+	git preserve-permissions --check --verbose
 	git preserve-permissions --save
 	git add --all
 
