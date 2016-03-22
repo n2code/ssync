@@ -97,20 +97,20 @@ if [[ "$1" == "setup" ]]; then
 elif [[ "$1" == "add" ]]; then
 	shift
 
-	PASSED=$1
+	PASSED="$1"
 	TARGET="$SYNCREPO/files$PASSED"
 
-	if [[ $PASSED != /* || $PASSED == */ ]]; then
+	if [[ "$PASSED" != /* || "$PASSED" == */ ]]; then
 		errecho "Absolute path without trailing slash required!"
 		exit 1
 	fi
 
-	if [[ -e $PASSED && -e $TARGET ]]; then
+	if [[ -e "$PASSED" && -e "$TARGET" ]]; then
 		errecho "ERROR, already in repository $SYNCREPO"
-	elif [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
-		if [[ -d $PASSED ]]; then
+	elif [[ -e "$PASSED" && ( -d "$PASSED" || -f "$PASSED" ) ]]; then
+		if [[ -d "$PASSED" ]]; then
 			SUCCESSMESSAGE="Directory sync added."
-		elif [[ -f $PASSED ]]; then
+		elif [[ -f "$PASSED" ]]; then
 			SUCCESSMESSAGE="File sync added."
 		fi
 
@@ -132,13 +132,13 @@ elif [[ "$1" == "remove" ]]; then
 	PASSED=$1
 	REPODATA="$SYNCREPO/files$PASSED"
 
-	if [[ $PASSED != /* || $PASSED == */ ]]; then
+	if [[ "$PASSED" != /* || "$PASSED" == */ ]]; then
 		echo "Absolute path without trailing slash required!" 1>&2
 		exit 1
 	fi
 
-	if [[ -L $PASSED ]]; then
-		if [[ -e $REPODATA ]]; then
+	if [[ -L "$PASSED" ]]; then
+		if [[ -e "$REPODATA" ]]; then
 			OUTPUT=$( rm --verbose "$PASSED" \
 				&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
 				&& rm -r --verbose "$REPODATA" \
@@ -157,9 +157,9 @@ elif [[ "$1" == "commit" ]]; then
 	OUTPUT=$(
 		cd "$SYNCREPO"
 		git add --all
-		$PERMSCRIPT --save --verbose
+		"$PERMSCRIPT" --save --verbose
 		git add "$PERMFILE"
-		$PERMSCRIPT --save
+		"$PERMSCRIPT" --save
 
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
 		if [[ "$1" != "" ]]; then MSG="$1"; fi
