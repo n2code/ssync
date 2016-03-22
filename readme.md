@@ -1,6 +1,8 @@
 # sync files all over the place
 **ssync** (**s**ystem **sync**) is a symlinking git wrapper for [config] files.
 
+:warning: *Currently in early development. You might want to avoid productive use until this notice is removed...* :construction:
+
 ## Synopsis
 It acts as a wrapper to put any file into its repository and puts a symlink in the original place. This allows to apply version control without having to store stuff in one place or litter your drive with separate repositories.
 
