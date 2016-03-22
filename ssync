@@ -1,6 +1,5 @@
 #!/bin/bash
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "${DIR}"
 
 if [[ $EUID -ne 0 ]]; then
 	echo "This must be run as root." 1>&2
@@ -8,20 +7,26 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 function usagehelp () {
-	echo "USAGE: ssync setup"
+	echo "USAGE: ssync setup [new]"
 	echo "       ssync [verbose] add /path/to/unversioned/file"
 	echo "       ssync [verbose] remove /path/to/versioned/file"
 	echo "       ssync [verbose] commit"
 }
 
-if [[ ! -f "settings.inc" ]]; then
-	cp "settings.inc.template" "settings.inc"
-	echo "Created default configuration in ${DIR}/settings.inc"
-	echo "Edit this file and restart this setup: ssync setup"
+function errecho {
+	echo "$1" 1>&2
+}
+
+if [[ ! -f "$DIR/settings.inc" ]]; then
+	cp "$DIR/settings.inc.template" "$DIR/settings.inc"
+	echo "Created default configuration in $DIR/settings.inc"
+	echo "Edit this file and restart this setup: ssync setup [new]"
 	exit 1
 fi
 
-source "${DIR}/settings.inc"
+source "$DIR/settings.inc"
+PERMFILE="file-permissions"
+INDEXFILE="ssync-index"
 
 if [[ "$1" == "verbose" ]]; then
 	shift
@@ -30,11 +35,32 @@ fi
 
 
 if [[ "$1" == "setup" ]]; then
+	shift
+
+	if [[ "$1" == "new" ]]; then
+		echo "SYSTEMSYNC-REPO-CREATION"
+		echo "########################"
+
+		TEMPREPO=$(mktemp -d)
+		cd "$TEMPREPO"
+		touch "$PERMFILE" "$INDEXFILE"
+		git init .
+		git config user.name "ssync"
+		git config user.email "ssync@localhost"
+		git add --all
+		git commit -m "initialized ssync repository"
+		git remote add central "$GITURL"
+		git push -u central master || ( errecho "Upload failed, aborting setup." && exit 1 )
+
+		rm -r "$TEMPREPO"
+	fi
+
 	echo "SYSTEMSYNC-SETUP"
 	echo "################"
 
 	echo "Cloning permission saver..."
-	git clone https://github.com/dr4Ke/git-preserve-permissions
+	cd "$DIR"
+	git clone https://github.com/dr4Ke/git-preserve-permissions git-preserve-permissions
 
 	echo "Checking out tested revision..."
 	cd git-preserve-permissions
@@ -56,7 +82,7 @@ if [[ "$1" == "setup" ]]; then
 	git config preserve-permissions.user true
 	git config preserve-permissions.group true
 	git config preserve-permissions.perms 0777
-	git config preserve-permissions.file "file-permissions"
+	git config preserve-permissions.file "$PERMFILE"
 	git config user.name "$GITUSER"
 	git config user.email "$GITEMAIL"
 	git config push.default matching
@@ -131,7 +157,7 @@ elif [[ "$1" == "commit" ]]; then
 		cd "$SYNCREPO"
 		git add --all
 		git preserve-permissions --save --verbose
-		git add "file-permissions"
+		git add "$PERMFILE"
 		git preserve-permissions --save
 
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
