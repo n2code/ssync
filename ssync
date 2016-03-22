@@ -1,8 +1,12 @@
 #!/bin/bash
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+function errecho {
+	echo "$1" 1>&2
+}
+
 if [[ $EUID -ne 0 ]]; then
-	echo "This must be run as root." 1>&2
+	errecho "This must be run as root."
 	exit 1
 fi
 
@@ -11,10 +15,6 @@ function usagehelp () {
 	echo "       ssync [verbose] add /path/to/unversioned/file"
 	echo "       ssync [verbose] remove /path/to/versioned/file"
 	echo "       ssync [verbose] commit"
-}
-
-function errecho {
-	echo "$1" 1>&2
 }
 
 if [[ ! -f "$DIR/settings.inc" ]]; then
@@ -99,12 +99,12 @@ elif [[ "$1" == "add" ]]; then
 	TARGET="$SYNCREPO/files$PASSED"
 
 	if [[ $PASSED != /* || $PASSED == */ ]]; then
-		echo "Absolute path without trailing slash required!" 1>&2
+		errecho "Absolute path without trailing slash required!"
 		exit 1
 	fi
 
 	if [[ -e $PASSED && -e $TARGET ]]; then
-		echo "ERROR, already in repository $SYNCREPO" 1>&2
+		errecho "ERROR, already in repository $SYNCREPO"
 	elif [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
 		if [[ -d $PASSED ]]; then
 			SUCCESSMESSAGE="Directory sync added."
@@ -120,7 +120,7 @@ elif [[ "$1" == "add" ]]; then
 			&& chmod --reference="$TARGET" --changes "$PASSED" \
 			&& echo "$SUCCESSMESSAGE" )
 	else
-		echo "ERROR, directory or file not found: $PASSED" 1>&2
+		errecho "ERROR, source directory or file not found"
 	fi
 
 
@@ -135,7 +135,6 @@ elif [[ "$1" == "remove" ]]; then
 		exit 1
 	fi
 
-	STATUS="ERROR, command failed on request:"
 	if [[ -L $PASSED ]]; then
 		if [[ -e $REPODATA ]]; then
 			OUTPUT=$( rm --verbose "$PASSED" \
@@ -143,10 +142,10 @@ elif [[ "$1" == "remove" ]]; then
 				&& rm -r --verbose "$REPODATA" \
 				&& echo "Restored at original location." )
 		else
-			echo "ERROR, is a symlink but not in repo: $PASSED" 1>&2
+			errecho "ERROR, is a symlink but not in repo"
 		fi
 	else
-		echo "ERROR, no symlink: $PASSED" 1>&2
+		errecho "ERROR, no symlink encountered"
 	fi
 
 
