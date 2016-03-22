@@ -21,6 +21,11 @@ fi
 
 source "${DIR}/settings.inc"
 
+if [[ "$1" == "verbose" ]]; then
+	shift
+	VERBOSE="yes"
+fi
+
 if [[ "$1" == "setup" ]]; then
 	echo "SYSTEMSYNC-SETUP"
 	echo "################"
@@ -73,42 +78,35 @@ elif [[ "$1" == "add" ]]; then
 		exit 1
 	fi
 
-	STATUS="ERROR, command failed on request:"
 	if [[ -e $PASSED && -e $TARGET ]]; then
-		STATUS="ERROR, already in repository:"
+		echo "ERROR, already in repository $SYNCREPO" 1>&2
 	elif [[ -e $PASSED && ( -d $PASSED || -f $PASSED ) ]]; then
 		if [[ $OPTION == "nolink" ]]; then
 			if [[ -d $PASSED ]]; then
-				rsync --dirs --links --perms --times --group --owner "$PASSED/" "$TARGET" \
-				&& STATUS="Directory added without link:"
+				OUTPUT=$( rsync --dirs --links --perms --times --group --owner "$PASSED/" "$TARGET" > /dev/null \
+				&& echo "Directory added without link: $PASSED -> $TARGET" )
 			else
-				STATUS="ERROR, no directory:"
+				echo "ERROR, no directory: $PASSED" 1>&2
 			fi
 		else
 			if [[ -d $PASSED ]]; then
-				SUCCESSMESSAGE="Directory sync added:"
+				SUCCESSMESSAGE="Directory sync added."
 			elif [[ -f $PASSED ]]; then
-				SUCCESSMESSAGE="File sync added:"
+				SUCCESSMESSAGE="File sync added."
 			fi
 
-			read -d '' RUNNER <<"EOS"
-				rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
+			OUTPUT=$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
 				&& rm --recursive --verbose $PASSED \
 				&& echo "Relinking former location..." \
 				&& ln --symbolic "$TARGET" "$PASSED" \
 				&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
 				&& chmod --reference="$TARGET" --changes "$PASSED" \
-				&& STATUS="$SUCCESSMESSAGE"
-EOS
-			eval "$RUNNER"
+				&& echo "$SUCCESSMESSAGE" )
 		fi
-
 	else
-		STATUS="ERROR, directory or file not found:"
+		echo "ERROR, directory or file not found: $PASSED" 1>&2
 	fi
-	echo "####################"
-	echo "$STATUS"
-	echo "$PASSED -> $TARGET"
+
 
 elif [[ "$1" == "remove" ]]; then
 	shift
@@ -123,15 +121,12 @@ elif [[ "$1" == "remove" ]]; then
 
 	STATUS="ERROR, command failed on request:"
 	if [[ -L $PASSED && -e $REPODATA ]]; then
-		rm --verbose "$PASSED" \
-		&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$REPODATA/" "/" \
-		&& STATUS="Restored at original location:"
+		OUTPUT=$( rm --verbose "$PASSED" \
+			&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$REPODATA/" "/" \
+			&& STATUS="Restored at original location." )
 	else
-		STATUS="ERROR, no link encountered:"
+		STATUS="ERROR, no link encountered: $PASSED"
 	fi
-	echo "####################"
-	echo "$STATUS"
-	echo "$PASSED <- $REPODATA"
 
 
 elif [[ "$1" == "commit" ]]; then
@@ -148,8 +143,12 @@ elif [[ "$1" == "commit" ]]; then
 
 	git commit -m "$MSG"
 
+
 else
 	usagehelp
 fi
 
+if [[ "$VERBOSE" == "yes" ]]; then
+	echo "$OUTPUT"
+fi
 #EOF
