@@ -1,0 +1,15 @@
+# sync files all over the place
+**ssync** (**s**ystem **sync**) is a symlinking git wrapper for [config] files.
+
+## Synopsis
+It acts as a wrapper to put any file into its repository and puts a symlink in the original place. This allows to apply version control without having to store stuff in one place or litter your drive with separate repositories.
+
+The idea is to synchronize multiple machines this way by synchronizing everything that is not created by packages but was placed or configured manually. If you only care about files in `/etc` you might want to have a look at [etckeeper](https://github.com/joeyh/etckeeper), if manually gitting `~/.config` is enough, fine... but if you like to unify all of this and would like to have full control over a selective set of files **ssync** might be just the right tool for you.
+
+## Requirements
+- Dependencies
+  - `git` *- d'oh*
+  - `rsync`
+  - `perl` for [git-preserve-permissions](https://github.com/dr4ke) (pulled automatically)
+- Permissions
+  - needs to run as **root** to properly deal with file permissions
