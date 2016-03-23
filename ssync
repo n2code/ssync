@@ -1,5 +1,4 @@
 #!/bin/bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 function errecho {
 	echo "$1" 1>&2
@@ -10,13 +9,7 @@ if [[ $EUID -ne 0 ]]; then
 	exit 1
 fi
 
-function usagehelp () {
-	echo "USAGE: ssync setup [new]"
-	echo "       ssync [verbose] add /path/to/unversioned/file"
-	echo "       ssync [verbose] remove /path/to/versioned/file"
-	echo "       ssync [verbose] commit"
-}
-
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 if [[ ! -f "$DIR/settings.inc" ]]; then
 	cp "$DIR/settings.inc.template" "$DIR/settings.inc"
 	echo "Created default configuration in $DIR/settings.inc"
@@ -29,15 +22,15 @@ PERMFILE="file-permissions"
 INDEXFILE="ssync-index"
 PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 
-if [[ "$1" == "verbose" ]]; then
-	shift
-	VERBOSE="yes"
-fi
 
+function usagehelp () {
+	echo "USAGE: ssync setup [new]"
+	echo "       ssync [verbose] add /path/to/unversioned/file"
+	echo "       ssync [verbose] remove /path/to/versioned/file"
+	echo "       ssync [verbose] commit"
+}
 
-if [[ "$1" == "setup" ]]; then
-	shift
-
+function sync_setup {
 	if [[ "$1" == "new" ]]; then
 		echo "SYSTEMSYNC-REPO-CREATION"
 		echo "########################"
@@ -92,11 +85,9 @@ if [[ "$1" == "setup" ]]; then
 
 	echo "################"
 	echo "Setup complete."
+}
 
-
-elif [[ "$1" == "add" ]]; then
-	shift
-
+function sync_add {
 	PASSED="$1"
 	TARGET="$SYNCREPO/files$PASSED"
 
@@ -124,16 +115,14 @@ elif [[ "$1" == "add" ]]; then
 	else
 		errecho "ERROR, source directory or file not found"
 	fi
+}
 
-
-elif [[ "$1" == "remove" ]]; then
-	shift
-
+function sync_remove {
 	PASSED=$1
 	REPODATA="$SYNCREPO/files$PASSED"
 
 	if [[ "$PASSED" != /* || "$PASSED" == */ ]]; then
-		echo "Absolute path without trailing slash required!" 1>&2
+		errecho "Absolute path without trailing slash required!"
 		exit 1
 	fi
 
@@ -149,11 +138,9 @@ elif [[ "$1" == "remove" ]]; then
 	else
 		errecho "ERROR, no symlink encountered"
 	fi
+}
 
-
-elif [[ "$1" == "commit" ]]; then
-	shift
-
+function sync_commit {
 	OUTPUT=$(
 		cd "$SYNCREPO"
 		git add --all
@@ -165,12 +152,26 @@ elif [[ "$1" == "commit" ]]; then
 		if [[ "$1" != "" ]]; then MSG="$1"; fi
 		git commit -m "$MSG"
 	)
+}
 
 
-else
-	usagehelp
+#MAIN FLOW
+
+if [[ "$1" == "verbose" ]]; then
+	shift
+	VERBOSE="yes"
 fi
 
+MAINARG="$1"
+shift
+
+case "$MAINARG" in
+	 setup) sync_setup "$1";;
+	   add) sync_add "$1";;
+	remove) sync_remove "$1";;
+	commit) sync_commit;;
+	*)      usagehelp;;
+esac
 
 if [[ "$VERBOSE" == "yes" ]]; then
 	echo "$OUTPUT"
