@@ -19,7 +19,7 @@ fi
 
 source "$DIR/settings.inc"
 PERMFILE="file-permissions"
-INDEXFILE="ssync-index"
+LINKINDEX="ssync-linkindex"
 PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 
 
@@ -37,7 +37,7 @@ function sync_setup {
 
 		TEMPREPO=$(mktemp -d)
 		cd "$TEMPREPO"
-		touch "$PERMFILE" "$INDEXFILE"
+		touch "$PERMFILE" "$LINKINDEX"
 		git init .
 		git config user.name "ssync"
 		git config user.email "ssync@localhost"
@@ -69,9 +69,6 @@ function sync_setup {
 		errecho "CLONE FAILED." && exit 1
 	fi
 
-	echo "Installing hook(s)..."
-	cp post-checkout "$SYNCREPO/.git/hooks/"
-
 	echo "Setting up local repository..."
 	cd "$SYNCREPO"
 	git config preserve-permissions.user true
@@ -82,9 +79,37 @@ function sync_setup {
 	git config user.email "$GITEMAIL"
 	git config push.default matching
 	git checkout -f "$GITBRANCH"
+	"$PERMSCRIPT" --restore
 
 	echo "################"
 	echo "Setup complete."
+}
+
+function is_indexed {
+	MATCHES=$(grep --count --fixed-strings --line-regexp "$2" "$1")
+	case "$MATCHES" in
+		"0") return 42;;
+		"1") return 0;;
+		*) errecho "WARNING: $1 corrupt. Duplicate entries!"; return 0;;
+	esac
+}
+
+function add_to_index {
+	if is_indexed "$1" "$2"; then
+		errecho "WARNING: Attempt to add already index entry to $1"
+	else
+		echo "$2" | sort -o "$1" - "$1"
+	fi
+}
+
+function remove_from_index {
+	if ! is_indexed "$1" "$2"; then
+		errecho "WARNING: Attempt to remove non-indexed entry from $1"
+	else
+		cp -a "$1" "$1.tmp"
+		grep --invert-match --fixed-strings --line-regexp "$2" "$1.tmp" > "$1"
+		rm "$1.tmp"
+	fi
 }
 
 function sync_add {
@@ -111,6 +136,7 @@ function sync_add {
 			&& ln --symbolic "$TARGET" "$PASSED" \
 			&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
 			&& chmod --reference="$TARGET" --changes "$PASSED" \
+			&& add_to_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
 			&& echo "$SUCCESSMESSAGE" )
 	else
 		errecho "ERROR, source directory or file not found"
@@ -131,6 +157,7 @@ function sync_remove {
 			OUTPUT=$( rm --verbose "$PASSED" \
 				&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
 				&& rm -r --verbose "$REPODATA" \
+				&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
 				&& echo "Restored at original location." )
 		else
 			errecho "ERROR, is a symlink but not in repo"
