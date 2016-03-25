@@ -13,5 +13,6 @@ The idea is to synchronize multiple machines this way by synchronizing everythin
   - `git` *- d'oh*
   - `rsync`
   - `perl` for [git-preserve-permissions](https://github.com/dr4ke) (pulled automatically)
+  - GNU's `coreutils`
 - Permissions
   - needs to run as **root** to properly deal with file permissions

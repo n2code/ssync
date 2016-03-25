@@ -10,10 +10,15 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-if [[ ! -f "$DIR/settings.inc" ]]; then
+if ( test ! -f "$DIR/settings.inc" ) || ( cmp -s "$DIR/settings.inc.template" "$DIR/settings.inc" >/dev/null ); then
 	cp "$DIR/settings.inc.template" "$DIR/settings.inc"
-	echo "Created default configuration in $DIR/settings.inc"
-	echo "Edit this file and restart this setup: ssync setup [new]"
+	echo "Welcome to ssync!
+A default configuration was copied to $DIR/settings.inc
+Edit this file and restart this setup by using
+    ssync setup
+to pull the ssync repository from GITURL or even
+    ssync setup new
+for first use of this tool ever (this initializes a fresh repo and pushes it upstream)."
 	exit 1
 fi
 
@@ -24,10 +29,10 @@ PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 
 
 function usagehelp () {
-	echo "USAGE: ssync setup [new]"
-	echo "       ssync [verbose] add /path/to/unversioned/file"
-	echo "       ssync [verbose] remove /path/to/versioned/file"
-	echo "       ssync [verbose] commit [message]"
+	echo "USAGE: ssync setup [new]
+       ssync [verbose] add /path/to/unversioned/file
+       ssync [verbose] remove /path/to/versioned/file
+       ssync [verbose] commit [message]"
 }
 
 function sync_setup {
@@ -116,13 +121,10 @@ function sync_add {
 	PASSED="$1"
 	TARGET="$SYNCREPO/files$PASSED"
 
-	if [[ "$PASSED" != /* || "$PASSED" == */ ]]; then
-		errecho "Absolute path without trailing slash required!"
-		exit 1
-	fi
-
 	if [[ -e "$PASSED" && -e "$TARGET" ]]; then
 		errecho "ERROR, already in repository $SYNCREPO"
+	elif [[ -L "$PASSED" ]]; then
+		errecho "ERROR, symlinks cannot be synced"
 	elif [[ -e "$PASSED" && ( -d "$PASSED" || -f "$PASSED" ) ]]; then
 		if [[ -d "$PASSED" ]]; then
 			SUCCESSMESSAGE="Directory sync added."
@@ -176,7 +178,7 @@ function sync_commit {
 		"$PERMSCRIPT" --save
 
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
-		if [[ "$1" != "" ]]; then MSG="$1"; fi
+		if [[ ! -z "$1" ]]; then MSG="$1"; fi
 		git commit -m "$MSG"
 	)
 }
@@ -192,12 +194,30 @@ fi
 MAINARG="$1"
 shift
 
+case "$MAINARG" in add|remove|commit) if [[ ! -e "$SYNCREPO/.git" ]]; then
+	errecho "ERROR: Setup not completed."
+	usagehelp && exit 1
+fi;; esac
+
 case "$MAINARG" in
-	 setup) sync_setup "$1";;
-	   add) sync_add "$1";;
-	remove) sync_remove "$1";;
-	commit) sync_commit "$1";;
-	*)      usagehelp;;
+	setup)
+		sync_setup "$1";;
+	add|remove)
+		FULLPATH=$(realpath --quiet --canonicalize-missing --no-symlinks "$1")
+		if [[ -z "$FULLPATH" ]]; then
+			errecho "ERROR, no path given!"
+			usagehelp && exit 1
+		fi
+
+		case "$MAINARG" in
+			add) sync_add "$FULLPATH";;
+			remove) sync_remove "$FULLPATH";;
+		esac
+		;;
+	commit)
+		sync_commit "$1";;
+	*)
+		usagehelp;;
 esac
 
 if [[ "$VERBOSE" == "yes" ]]; then
