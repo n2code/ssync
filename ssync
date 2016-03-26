@@ -120,6 +120,26 @@ function remove_from_index {
 	fi
 }
 
+function is_child_of {
+	#resolve links
+	CHILD=$(readlink -m "$1")
+	PARENT=$(readlink -m "$2")
+	
+	#strip repo if currently synced
+	CHILD="${CHILD##"$SYNCREPO/files"}"
+	PARENT="${PARENT##"$SYNCREPO/files"}"
+
+	#remove base from path and see if path has changed (check for starting slash to account for partial directory names having been removed)
+	REDUCED="${CHILD##"$PARENT"}"
+	if [[ "$REDUCED" != "$CHILD" ]] && [[ $REDUCED == /* ]]; then return 0; else return 1; fi
+}
+
+function is_in_repo {
+	while read LINE; do
+		echo -n "$LINE"
+	done <"$SYNCREPO/$LINKINDEX"
+}
+
 function sync_add {
 	PASSED="$1"
 	TARGET="$SYNCREPO/files$PASSED"
@@ -238,12 +258,12 @@ case "$MAINARG" in
 				usagehelp && exit 1
 				;;
 			mv|clean)
-				errecho "You should avoid these commands to keep ssync working properly.\nIf you are sure about what you're doing, specify an override:\n    git override $1 ..."
+				errecho "You should avoid these commands to keep ssync working properly.\nIf you are sure about what you are doing, specify an override:\n    git override $1 ..."
 				exit 1
 				;;
 			override)
 				shift
-				;&
+				;;
 			*)
 				cd "$SYNCREPO" && git "$@"
 				;;
