@@ -171,7 +171,7 @@ function sync_add {
 			SUCCESSMESSAGE="File sync added."
 		fi
 
-		OUTPUT=$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
+		OUTPUT+=$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
 			&& rm --recursive --verbose $PASSED \
 			&& echo "Relinking former location..." \
 			&& ln --symbolic "$TARGET" "$PASSED" \
@@ -195,7 +195,7 @@ function sync_rm {
 
 	if [[ -L "$PASSED" ]]; then
 		if [[ -e "$REPODATA" ]]; then
-			OUTPUT=$( rm --verbose "$PASSED" \
+			OUTPUT+=$( rm --verbose "$PASSED" \
 				&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
 				&& rm -r --verbose "$REPODATA" \
 				&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
@@ -209,7 +209,7 @@ function sync_rm {
 }
 
 function sync_commit {
-	OUTPUT=$(
+	OUTPUT+=$(
 		cd "$SYNCREPO"
 		git add --all
 		"$PERMSCRIPT" --save --verbose
@@ -233,9 +233,9 @@ function sync_status {
 function sync_check {
 	VERBOSE="yes"
 	if is_in_repo "$1"; then
-		OUTPUT="In ssync repository."
+		OUTPUT+="In ssync repository. "
 	else
-		OUTPUT="Not in repository."
+		OUTPUT+="Not in repository. "
 	fi
 }
 
@@ -247,6 +247,7 @@ if [[ "$1" == "verbose" ]]; then
 	VERBOSE="yes"
 fi
 
+OUTPUT=""
 MAINARG="$1"
 shift
 
@@ -258,18 +259,22 @@ fi;; esac
 case "$MAINARG" in
 	setup)
 		sync_setup "$1";;
-	add|remove|check)
-		FULLPATH=$(realpath --quiet --canonicalize-missing --no-symlinks "$1")
-		if [[ -z "$FULLPATH" ]]; then
-			errecho "ERROR, no path given!"
-			usagehelp && exit 1
-		fi
+	add|rm|check)
+		while : ; do
+			FULLPATH=$(realpath --quiet --canonicalize-missing --no-symlinks "$1")
+			if [[ -z "$FULLPATH" ]]; then
+				errecho "ERROR, no path given!"
+				usagehelp && exit 1
+			fi
 
-		case "$MAINARG" in
-			add) sync_add "$FULLPATH";;
-			remove) sync_remove "$FULLPATH";;
-			check) sync_check "$FULLPATH";;
-		esac
+			case "$MAINARG" in
+				add) sync_add "$FULLPATH";;
+				rm) sync_rm "$FULLPATH";;
+				check) sync_check "$FULLPATH";;
+			esac
+			shift
+			[[ "$1" ]] || break
+		done
 		;;
 	commit)
 		sync_commit "$1";;
