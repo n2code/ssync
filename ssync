@@ -36,11 +36,11 @@ PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 function usagehelp () {
 	echo "USAGE: ssync setup [new]
        ssync [verbose] add /path/to/unversioned/file
-       ssync [verbose] remove /path/to/versioned/file
+       ssync [verbose] rm /path/to/versioned/file
        ssync check /path/to/file
+       ssync status
        ssync [verbose] commit [message]
        ssync links
-       ssync indexdiff
        ssync git ..."
 }
 
@@ -184,7 +184,7 @@ function sync_add {
 	fi
 }
 
-function sync_remove {
+function sync_rm {
 	PASSED=$1
 	REPODATA="$SYNCREPO/files$PASSED"
 
@@ -226,7 +226,7 @@ function sync_show_index {
 	cat "$SYNCREPO/$LINKINDEX"
 }
 
-function sync_indexdiff {
+function sync_status {
 	cd "$SYNCREPO" && git --no-pager diff "$LINKINDEX" | grep -E "^[+-]/.+$" | LC_ALL=C sort
 }
 
@@ -250,7 +250,7 @@ fi
 MAINARG="$1"
 shift
 
-case "$MAINARG" in add|remove|check|commit|links|indexdiff|git) if [[ ! -e "$SYNCREPO/.git" ]]; then
+case "$MAINARG" in add|rm|check|commit|links|status|git) if [[ ! -e "$SYNCREPO/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	usagehelp && exit 1
 fi;; esac
@@ -275,8 +275,8 @@ case "$MAINARG" in
 		sync_commit "$1";;
 	links)
 		sync_show_index;;
-	indexdiff)
-		sync_indexdiff;;
+	status)
+		sync_status;;
 	git)
 		case "$1" in
 			add|rm|commit)
