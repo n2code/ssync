@@ -9,7 +9,11 @@ if [[ $EUID -ne 0 ]]; then
 	exit 1
 fi
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+SCRIPT="${BASH_SOURCE[0]}"
+if [[ -L "$SCRIPT" ]]; then SCRIPT="$( readlink -ms "$SCRIPT" )"; fi
+DIR="$( dirname "$SCRIPT" )"
+
 if ( test ! -f "$DIR/settings.inc" ) || ( cmp -s "$DIR/settings.inc.template" "$DIR/settings.inc" >/dev/null ); then
 	cp "$DIR/settings.inc.template" "$DIR/settings.inc"
 	echo "Welcome to ssync!
@@ -77,6 +81,14 @@ function sync_setup {
 	if ! git clone "$GITURL" "$SYNCREPO"; then
 		errecho "CLONE FAILED." && exit 1
 	fi
+
+	echo "Setting up hooks..."
+	echo -e "#!/bin/bash\n$PERMSCRIPT --restore" > "$SYNCREPO/.git/hooks/post-checkout"
+	chmod u+x "$SYNCREPO/.git/hooks/post-checkout"
+	cp "$SYNCREPO/.git/hooks/post-checkout" "$SYNCREPO/.git/hooks/post-merge"
+
+	echo "Linking ssync in /usr/local/bin ..."
+	ln -s "$DIR/ssync" "/usr/local/bin/ssync"
 
 	echo "Setting up local repository..."
 	cd "$SYNCREPO"
