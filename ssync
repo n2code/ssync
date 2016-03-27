@@ -16,6 +16,7 @@ DIR="$( dirname "$SCRIPT" )"
 
 if ( test ! -f "$DIR/settings.inc" ) || ( cmp -s "$DIR/settings.inc.template" "$DIR/settings.inc" >/dev/null ); then
 	cp "$DIR/settings.inc.template" "$DIR/settings.inc"
+	if [[ ! -e "/usr/local/bin/ssync" ]]; then ln -s "$DIR/ssync" "/usr/local/bin/ssync"; fi
 	echo "Welcome to ssync!
 A default configuration was copied to $DIR/settings.inc
 Edit this file and restart this setup by using
@@ -87,7 +88,8 @@ function sync_setup {
 	chmod u+x "$SYNCREPO/.git/hooks/post-checkout"
 	cp "$SYNCREPO/.git/hooks/post-checkout" "$SYNCREPO/.git/hooks/post-merge"
 
-	echo "Linking ssync in /usr/local/bin ..."
+	echo "(Re)Linking ssync in /usr/local/bin ..."
+	rm "/usr/local/bin/ssync" 2> /dev/null
 	ln -s "$DIR/ssync" "/usr/local/bin/ssync"
 
 	echo "Setting up local repository..."
