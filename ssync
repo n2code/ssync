@@ -52,8 +52,8 @@ function sync_setup {
 		git config user.email "ssync@localhost"
 		git add --all
 		git commit -m "initialized ssync repository"
-		git remote add central "$GITURL"
-		git push -u central master || ( errecho "Upload failed, aborting setup." && exit 1 )
+		git remote add origin "$GITURL"
+		git push -u origin master || ( errecho "Upload failed, aborting setup." && exit 1 )
 
 		rm -r "$TEMPREPO"
 	fi
@@ -236,7 +236,7 @@ fi
 MAINARG="$1"
 shift
 
-case "$MAINARG" in add|remove|commit|links|indexdiff|check|git) if [[ ! -e "$SYNCREPO/.git" ]]; then
+case "$MAINARG" in add|remove|check|commit|links|indexdiff|git) if [[ ! -e "$SYNCREPO/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	usagehelp && exit 1
 fi;; esac
