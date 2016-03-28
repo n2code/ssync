@@ -150,8 +150,9 @@ function is_child_of {
 }
 
 function is_in_repo {
+	TESTED="$1"
 	while read LINE; do
-		if [[ "$1" == "$LINE" ]] || is_child_of "$1" "$LINE"; then return 0; fi
+		if [[ "$TESTED" == "$LINE" ]] || is_child_of "$TESTED" "$LINE"; then return 0; fi
 	done <"$SYNCREPO/$LINKINDEX"
 	return 1
 }
@@ -160,8 +161,8 @@ function sync_add {
 	PASSED="$1"
 	TARGET="$SYNCREPO/files$PASSED"
 
-	if [[ -e "$PASSED" && -e "$TARGET" ]]; then
-		errecho "ERROR, already in repository $SYNCREPO"
+	if is_in_repo "$PASSED"; then
+		errecho "ERROR, already part of repository $SYNCREPO"
 	elif [[ -L "$PASSED" ]]; then
 		errecho "ERROR, symlinks cannot be synced"
 	elif [[ -e "$PASSED" && ( -d "$PASSED" || -f "$PASSED" ) ]]; then
@@ -261,7 +262,10 @@ case "$MAINARG" in
 		sync_setup "$1";;
 	add|rm|check)
 		while : ; do
+			#calculate resolved non-repo path
 			FULLPATH=$(realpath --quiet --canonicalize-missing --no-symlinks "$1")
+			FULLPATH="${FULLPATH##"$SYNCREPO/files"}"
+
 			if [[ -z "$FULLPATH" ]]; then
 				errecho "ERROR, no path given!"
 				usagehelp && exit 1
