@@ -74,7 +74,7 @@ function sync_setup {
 		echo "SYSTEMSYNC-REPO-CREATION"
 		echo "########################"
 
-		TEMPREPO=$(mktemp -d)
+		TEMPREPO="$(mktemp -d)"
 		cd "$TEMPREPO"
 		touch "$PERMFILE" "$LINKINDEX"
 		git init .
@@ -134,7 +134,7 @@ function sync_setup {
 }
 
 function is_indexed {
-	MATCHES=$(grep --count --fixed-strings --line-regexp "$2" "$1")
+	MATCHES="$(grep --count --fixed-strings --line-regexp "$2" "$1")"
 	case "$MATCHES" in
 		"0") return 42;;
 		"1") return 0;;
@@ -162,8 +162,8 @@ function remove_from_index {
 
 function is_child_of {
 	#resolve links
-	CHILD=$(readlink -m "$1")
-	PARENT=$(readlink -m "$2")
+	CHILD="$(readlink -m "$1")"
+	PARENT="$(readlink -m "$2")"
 	
 	#strip repo if currently synced
 	CHILD="${CHILD##"$SYNCREPO/files"}"
@@ -171,7 +171,7 @@ function is_child_of {
 
 	#remove base from path and see if path has changed (check for starting slash to account for partial directory names having been removed)
 	REDUCED="${CHILD##"$PARENT"}"
-	if [[ "$REDUCED" != "$CHILD" ]] && [[ $REDUCED == /* ]]; then return 0; else return 1; fi
+	if [[ "$REDUCED" != "$CHILD" ]] && [[ "$REDUCED" == /* ]]; then return 0; else return 1; fi
 }
 
 function is_in_repo {
@@ -197,21 +197,21 @@ function sync_add {
 			SUCCESSMESSAGE="File sync added."
 		fi
 
-		OUTPUT+=$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
-			&& rm --recursive --verbose $PASSED \
+		OUTPUT+="$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
+			&& rm --recursive --verbose "$PASSED" \
 			&& echo "Relinking former location..." \
 			&& ln --symbolic "$TARGET" "$PASSED" \
 			&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
 			&& chmod --reference="$TARGET" --changes "$PASSED" \
 			&& add_to_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
-			&& echo "$SUCCESSMESSAGE" )
+			&& echo "$SUCCESSMESSAGE" )"
 	else
 		errecho "ERROR, source directory or file not found"
 	fi
 }
 
 function sync_rm {
-	PASSED=$1
+	PASSED="$1"
 	REPODATA="$SYNCREPO/files$PASSED"
 
 	if [[ "$PASSED" != /* || "$PASSED" == */ ]]; then
@@ -221,11 +221,11 @@ function sync_rm {
 
 	if [[ -L "$PASSED" ]]; then
 		if [[ -e "$REPODATA" ]]; then
-			OUTPUT+=$( rm --verbose "$PASSED" \
+			OUTPUT+="$( rm --verbose "$PASSED" \
 				&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
 				&& rm -r --verbose "$REPODATA" \
 				&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
-				&& echo "Restored at original location." )
+				&& echo "Restored at original location." )"
 		else
 			errecho "ERROR, is a symlink but not in repo"
 		fi
@@ -235,7 +235,7 @@ function sync_rm {
 }
 
 function sync_commit {
-	OUTPUT+=$(
+	OUTPUT+="$(
 		cd "$SYNCREPO"
 		git add --all
 		"$PERMSCRIPT" --save --verbose
@@ -245,7 +245,7 @@ function sync_commit {
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
 		if [[ ! -z "$1" ]]; then MSG="$1"; fi
 		git commit -m "$MSG"
-	)
+	)"
 }
 
 function sync_show_index {
@@ -288,7 +288,7 @@ case "$MAINARG" in
 	add|rm|check)
 		while : ; do
 			#calculate resolved non-repo path
-			FULLPATH=$(realpath --quiet --canonicalize-missing --no-symlinks "$1")
+			FULLPATH="$(realpath --quiet --canonicalize-missing --no-symlinks "$1")"
 			FULLPATH="${FULLPATH##"$SYNCREPO/files"}"
 
 			if [[ -z "$FULLPATH" ]]; then
