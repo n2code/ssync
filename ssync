@@ -34,14 +34,39 @@ PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 
 
 function usagehelp () {
-	echo "USAGE: ssync setup [new]
-       ssync [verbose] add /path/to/unversioned/file
-       ssync [verbose] rm /path/to/versioned/file
-       ssync check /path/to/file
-       ssync status
-       ssync [verbose] commit [message]
-       ssync links
-       ssync git ..."
+	echo "
+USAGE: ssync COMMAND [PARAMETERS]
+
+COMMANDS:
+    setup [new]
+          Initializes ssync. If settings file is not found a template is created
+          and the user is prompted to edit it and execute this command again.
+          Adding the \"new\" option creates the necessary repository structures
+          and pushes them to an empty git repository with the specified GITURL,
+          otherwise it is simply cloned.
+
+    [verbose] add PATH
+          Move file or folder to repository to enable synchronization. This
+          creates a symlink in its original place.
+
+    [verbose] rm PATH
+          Unlink element in repository and restore original file/folder. It is
+          not possible to remove children of a linked parent folder.
+
+    check PATH
+          Query if path is part of repository.
+
+    status
+          Display changes since last commit (added or removed entries).
+
+    [verbose] commit [MESSAGE]
+          Bundle changes in a commit for synchronization.
+
+    links
+          List paths of all repository elements.
+
+    git ...
+          Pipe git command through to underlying git."
 }
 
 function sync_setup {
