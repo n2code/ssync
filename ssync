@@ -93,13 +93,13 @@ function sync_setup {
 
 	echo "Cloning permission saver..."
 	cd "$DIR"
-	if ! git clone https://github.com/dr4Ke/git-preserve-permissions "git-preserve-permissions"; then
+	if ! git clone https://github.com/n2code/git-preserve-permissions "git-preserve-permissions"; then
 		errecho "CLONE FAILED." && exit 1
 	fi
 
 	echo "Checking out tested revision..."
 	cd git-preserve-permissions
-	if ! git checkout -f 8bb161714cdc148214928e0115fd50fc407f0922; then
+	if ! git checkout -q -f 8bb161714cdc148214928e0115fd50fc407f0922; then
 		errecho "CHECKOUT FAILED." && exit 1
 	fi
 
