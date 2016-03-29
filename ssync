@@ -214,23 +214,17 @@ function sync_rm {
 	PASSED="$1"
 	REPODATA="$SYNCREPO/files$PASSED"
 
-	if [[ "$PASSED" != /* || "$PASSED" == */ ]]; then
-		errecho "Absolute path without trailing slash required!"
-		exit 1
-	fi
-
-	if [[ -L "$PASSED" ]]; then
-		if [[ -e "$REPODATA" ]]; then
-			OUTPUT+="$( rm --verbose "$PASSED" \
-				&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
-				&& rm -r --verbose "$REPODATA" \
-				&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
-				&& echo "Restored at original location." )"
-		else
-			errecho "ERROR, is a symlink but not in repo"
-		fi
-	else
+	if ! is_indexed "$SYNCREPO/$LINKINDEX" "$PASSED"; then
+		errecho "ERROR, no repository link (see: ssync links)"
+	elif [[ ! -L "$PASSED" ]]; then
 		errecho "ERROR, no symlink encountered"
+		errecho "WARNING: $SYNCREPO/$LINKINDEX corrupt. Link missing!"
+	else
+		OUTPUT+="$( rm --verbose "$PASSED" \
+			&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
+			&& rm -r --verbose "$REPODATA" \
+			&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
+			&& echo "Restored at original location." )"
 	fi
 }
 
