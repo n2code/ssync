@@ -28,10 +28,12 @@ for first use of this tool ever (this initializes a fresh repo and pushes it ups
 fi
 
 source "$DIR/settings.inc"
-PERMFILE="file-permissions"
+PERMFILE="ssync-file-permissions"
 LINKINDEX="ssync-linkindex"
-PERMSCRIPT="${DIR}/git-preserve-permissions/git-preserve-permissions"
 
+function helphint {
+	errecho " => ssync help"
+}
 
 function usagehelp () {
 	echo "
@@ -301,7 +303,7 @@ shift
 
 case "$MAINARG" in add|rm|check|commit|links|status|git|rebuild) if [[ ! -e "$SYNCREPO/.git" ]]; then
 	errecho "ERROR: Setup not completed."
-	usagehelp && exit 1
+	helphint && exit 1
 fi;; esac
 
 case "$MAINARG" in
@@ -318,7 +320,7 @@ case "$MAINARG" in
 
 			if [[ -z "$FULLPATH" ]]; then
 				errecho "ERROR, no path given!"
-				usagehelp && exit 1
+				helphint && exit 1
 			fi
 
 			case "$MAINARG" in
@@ -340,7 +342,7 @@ case "$MAINARG" in
 		case "$1" in
 			add|rm|commit)
 				errecho "Please use the designated ssync commands instead of git $1"
-				usagehelp && exit 1
+				helphint && exit 1
 				;;
 			mv|clean)
 				errecho "You should avoid these commands to keep ssync working properly.\nIf you are sure about what you are doing, specify an override:\n    git override $1 ..."
