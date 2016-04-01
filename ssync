@@ -37,7 +37,7 @@ function helphint {
 
 function usagehelp () {
 	echo "
-USAGE: ssync COMMAND [PARAMETERS]
+USAGE: ssync [verbose] COMMAND
 
 COMMANDS:
     setup [new]
@@ -47,11 +47,11 @@ COMMANDS:
           and pushes them to an empty git repository with the specified GITURL,
           otherwise it is simply cloned.
 
-    [verbose] add PATH
+    add PATH
           Move file or folder to repository to enable synchronization. This
           creates a symlink in its original place.
 
-    [verbose] rm PATH
+    rm PATH
           Unlink element in repository and restore original file/folder. It is
           not possible to remove children of a linked parent folder.
 
@@ -61,7 +61,7 @@ COMMANDS:
     status
           Display changes since last commit (added or removed entries).
 
-    [verbose] commit [MESSAGE]
+    commit [MESSAGE]
           Bundle changes in a commit for synchronization.
 
     links
