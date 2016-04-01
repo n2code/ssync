@@ -292,7 +292,11 @@ function restore_permissions {
 function ask_confirm {
 	local MESSAGE="$1" ANSWER
 	while [[ ! "$ANSWER" =~ ^[yYnN]$ ]]; do
-		read -r -n 1 -p "$MESSAGE [y/n]: " ANSWER && echo
+		if ! read -r -n 1 -p "$MESSAGE [y/n]: " -t 99 ANSWER; then
+			ANSWER="n"
+			echo -n "$ANSWER (chosen by timeout)"
+		fi
+		echo
 	done
 	if [[ "$ANSWER" =~ ^[yY]$ ]]; then return 0; else return 1; fi
 }
