@@ -100,7 +100,7 @@ function sync_setup {
 	fi
 
 	echo "Setting up hooks..."
-	echo -e "#!/bin/bash\n$DIR/ssync rebuild" > "$SYNCREPO/.git/hooks/post-checkout"
+	echo -e "#!/bin/bash\n$DIR/ssync fix" > "$SYNCREPO/.git/hooks/post-checkout"
 	chmod u+x "$SYNCREPO/.git/hooks/post-checkout"
 	cp "$SYNCREPO/.git/hooks/post-checkout" "$SYNCREPO/.git/hooks/post-merge"
 
@@ -177,6 +177,15 @@ function is_in_repo {
 	return 1
 }
 
+function add_clone_link {
+	local ORIGINAL="$1" LINK="$2"
+
+	( ln --symbolic -- "$ORIGINAL" "$LINK" \
+	&& chown --no-dereference --reference="$ORIGINAL" --verbose -- "$LINK" \
+	&& chmod --reference="$ORIGINAL" --changes -- "$LINK" \
+	&& return 0 ) || return 1
+}
+
 function sync_add {
 	local PASSED="$1" TARGET
 
@@ -194,11 +203,9 @@ function sync_add {
 		fi
 
 		OUTPUT+="$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
-			&& rm --recursive --verbose "$PASSED" \
+			&& rm --recursive --verbose -- "$PASSED" \
 			&& echo "Relinking former location..." \
-			&& ln --symbolic "$TARGET" "$PASSED" \
-			&& chown --no-dereference --reference="$TARGET" --verbose "$PASSED" \
-			&& chmod --reference="$TARGET" --changes "$PASSED" \
+			&& add_clone_link "$TARGET" "$PASSED" \
 			&& add_to_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
 			&& echo "$SUCCESSMESSAGE" )"
 	else
@@ -284,10 +291,56 @@ function restore_permissions {
 	done < "$SYNCREPO/$PERMFILE"
 }
 
-function sync_rebuild {
-	echo "Rebuilding local repository..."
+function ask_confirm {
+	local MESSAGE="$1" ANSWER
+	while [[ ! "$ANSWER" =~ ^[yYnN]$ ]]; do
+		read -r -n 1 -p "$MESSAGE [y/n]: " -u 3 ANSWER
+		echo
+	done 3<&0
+	if [[ "$ANSWER" =~ ^[yY]$ ]]; then return 0; else return 1; fi
+}
+
+function sync_fix {
+	local LOCATION TARGET REALLOCATION PROBLEMS=0
+
+	echo "Checking local repository against index..."
+	while read LOCATION; do
+		TARGET="$SYNCREPO/files$LOCATION"
+		echo -n "$LOCATION => "
+		if [[ -L "$LOCATION" ]]; then
+			REALLOCATION="$(realpath --quiet --canonicalize-missing "$LOCATION")"
+			if [[ "$REALLOCATION" == "$SYNCREPO/files/"* ]]; then
+				#in repo, all fine
+				echo "ok"
+			else
+				echo "LINK CONFLICT!"
+				errecho "The indexed symlink is not pointing to the repository as expected: $LOCATION"
+				if ask_confirm "Delete existing symlink and link to repository instead?"; then
+					( rm -- "$LOCATION" \
+					&& add_clone_link "$TARGET" "$LOCATION" ) \
+					|| ( echo "Correcting link failed." && ((PROBLEMS++)) )
+				else ((PROBLEMS++)); fi
+			fi
+		elif [[ -e "$LOCATION" ]]; then
+			echo "CONTENT CONFLICT!"
+			errecho "Symlink to repository expected but file/folder found: $LOCATION"
+			if ask_confirm "Delete existing file/folder and link to repository instead?"; then
+				( rm -i -- "$LOCATION" && [[ ! -e "$LOCATION" ]] \
+				&& add_clone_link "$TARGET" "$LOCATION" ) \
+				|| ( echo "Linking failed." && ((PROBLEMS++)) )
+			else ((PROBLEMS++)); fi
+		else
+			echo "adding..."
+			add_clone_link "$TARGET" "$LOCATION" \
+			|| ( echo "Adding link failed." && ((PROBLEMS++)) )
+		fi
+	done <"$SYNCREPO/$LINKINDEX"
+
 	restore_permissions
-	#TODO: check for added/missing links
+
+	if (( $PROBLEMS > 0 )); then
+		errecho "\n[!] WARNING: $PROBLEMS problems unresolved and remaining. Re-run \"ssync fix\" to check again."
+	fi
 }
 
 #MAIN FLOW
@@ -301,7 +354,7 @@ OUTPUT=""
 MAINARG="$1"
 shift
 
-case "$MAINARG" in add|rm|check|commit|links|status|git|rebuild) if [[ ! -e "$SYNCREPO/.git" ]]; then
+case "$MAINARG" in add|rm|check|commit|links|status|git|fix) if [[ ! -e "$SYNCREPO/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	helphint && exit 1
 fi;; esac
@@ -309,9 +362,8 @@ fi;; esac
 case "$MAINARG" in
 	setup)
 		sync_setup "$1";;
-	rebuild)
-		sync_rebuild
-		;;
+	fix)
+		sync_fix;;
 	add|rm|check)
 		while : ; do
 			#calculate resolved non-repo path
