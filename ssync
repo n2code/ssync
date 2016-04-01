@@ -90,18 +90,7 @@ function sync_setup {
 
 	echo "SYSTEMSYNC-SETUP"
 	echo "################"
-
-	echo "Cloning permission saver..."
 	cd "$DIR"
-	if ! git clone https://github.com/n2code/git-preserve-permissions "git-preserve-permissions"; then
-		errecho "CLONE FAILED." && exit 1
-	fi
-
-	echo "Checking out tested revision..."
-	cd git-preserve-permissions
-	if ! git checkout -q -f 8bb161714cdc148214928e0115fd50fc407f0922; then
-		errecho "CHECKOUT FAILED." && exit 1
-	fi
 
 	echo "Cloning system config repo..."
 	if ! git clone "$GITURL" "$SYNCREPO"; then
@@ -109,7 +98,7 @@ function sync_setup {
 	fi
 
 	echo "Setting up hooks..."
-	echo -e "#!/bin/bash\n$PERMSCRIPT --restore" > "$SYNCREPO/.git/hooks/post-checkout"
+	echo -e "#!/bin/bash\n$DIR/ssync rebuild" > "$SYNCREPO/.git/hooks/post-checkout"
 	chmod u+x "$SYNCREPO/.git/hooks/post-checkout"
 	cp "$SYNCREPO/.git/hooks/post-checkout" "$SYNCREPO/.git/hooks/post-merge"
 
@@ -119,21 +108,18 @@ function sync_setup {
 
 	echo "Setting up local repository..."
 	cd "$SYNCREPO"
-	git config preserve-permissions.user true
-	git config preserve-permissions.group true
-	git config preserve-permissions.perms 0777
-	git config preserve-permissions.file "$PERMFILE"
 	git config user.name "$GITUSER"
 	git config user.email "$GITEMAIL"
 	git config push.default matching
 	git checkout -f "$GITBRANCH"
-	"$PERMSCRIPT" --restore
 
 	echo "################"
 	echo "Setup complete."
 }
 
 function is_indexed {
+	local MATCHES
+
 	MATCHES="$(grep --count --fixed-strings --line-regexp "$2" "$1")"
 	case "$MATCHES" in
 		"0") return 42;;
@@ -143,24 +129,30 @@ function is_indexed {
 }
 
 function add_to_index {
-	if is_indexed "$1" "$2"; then
+	local INDEXFILE="$1" LOCATION="$2"
+
+	if is_indexed "$INDEXFILE" "$LOCATION"; then
 		errecho "WARNING: Attempt to add already index entry to $1"
 	else
-		echo "$2" | sort -o "$1" - "$1"
+		echo "$LOCATION" | LC_ALL=C sort -o "$INDEXFILE" - "$INDEXFILE"
 	fi
 }
 
 function remove_from_index {
-	if ! is_indexed "$1" "$2"; then
-		errecho "WARNING: Attempt to remove non-indexed entry from $1"
+	local INDEXFILE="$1" LOCATION="$2"
+
+	if ! is_indexed "$INDEXFILE" "$LOCATION"; then
+		errecho "WARNING: Attempt to remove non-indexed entry from $INDEXFILE"
 	else
-		cp -a "$1" "$1.tmp"
-		grep --invert-match --fixed-strings --line-regexp "$2" "$1.tmp" > "$1"
-		rm "$1.tmp"
+		cp -a "$INDEXFILE" "$INDEXFILE.tmp"
+		grep --invert-match --fixed-strings --line-regexp "$LOCATION" "$INDEXFILE.tmp" > "$INDEXFILE"
+		rm "$INDEXFILE.tmp"
 	fi
 }
 
 function is_child_of {
+	local CHILD PARENT REDUCED
+
 	#resolve links
 	CHILD="$(readlink -m "$1")"
 	PARENT="$(readlink -m "$2")"
@@ -175,7 +167,8 @@ function is_child_of {
 }
 
 function is_in_repo {
-	TESTED="$1"
+	local TESTED="$1" LINE
+
 	while read LINE; do
 		if [[ "$TESTED" == "$LINE" ]] || is_child_of "$TESTED" "$LINE"; then return 0; fi
 	done <"$SYNCREPO/$LINKINDEX"
@@ -183,7 +176,8 @@ function is_in_repo {
 }
 
 function sync_add {
-	PASSED="$1"
+	local PASSED="$1" TARGET
+
 	TARGET="$SYNCREPO/files$PASSED"
 
 	if is_in_repo "$PASSED"; then
@@ -211,7 +205,8 @@ function sync_add {
 }
 
 function sync_rm {
-	PASSED="$1"
+	local PASSED="$1" REPODATA
+
 	REPODATA="$SYNCREPO/files$PASSED"
 
 	if ! is_indexed "$SYNCREPO/$LINKINDEX" "$PASSED"; then
@@ -231,10 +226,8 @@ function sync_rm {
 function sync_commit {
 	OUTPUT+="$(
 		cd "$SYNCREPO"
+		save_permissions
 		git add --all
-		"$PERMSCRIPT" --save --verbose
-		git add "$PERMFILE"
-		"$PERMSCRIPT" --save
 
 		MSG="System update: $( git diff --staged --stat | tail -n1 )"
 		if [[ ! -z "$1" ]]; then MSG="$1"; fi
@@ -259,6 +252,41 @@ function sync_check {
 	fi
 }
 
+function save_permissions {
+	local LINE HIT
+
+	while read LINE; do
+		HIT="${LINE##"$SYNCREPO/files"}"
+		if is_in_repo "$HIT"; then
+			echo "$(stat --printf="%04a:%U:%G" "$LINE"):$HIT"
+		fi
+	done < <(find "$SYNCREPO/files" -mindepth 1 | LC_ALL=C sort) > "$SYNCREPO/$PERMFILE"
+}
+
+function restore_permissions {
+	local MOD USER GROUP LOCATION
+
+	echo "Updating permissions..."
+	while IFS=: read -r MOD USER GROUP LOCATION; do
+		LOCATION="$SYNCREPO/files$LOCATION"
+		if [[ -e "$LOCATION" ]]; then
+			if [[ "$USER:$GROUP" != "$(stat --printf="%U:%G" "$LOCATION")" ]]; then
+				chown --changes -- "$USER:$GROUP" "$LOCATION"
+			fi
+			if [[ "$MOD" != "$(stat --printf="%04a" "$LOCATION")" ]]; then
+				chmod --changes "$MOD" "$LOCATION"
+			fi
+		else
+			errecho "$LOCATION not found, permission restore failed."
+		fi
+	done < "$SYNCREPO/$PERMFILE"
+}
+
+function sync_rebuild {
+	echo "Rebuilding local repository..."
+	restore_permissions
+	#TODO: check for added/missing links
+}
 
 #MAIN FLOW
 
@@ -271,7 +299,7 @@ OUTPUT=""
 MAINARG="$1"
 shift
 
-case "$MAINARG" in add|rm|check|commit|links|status|git) if [[ ! -e "$SYNCREPO/.git" ]]; then
+case "$MAINARG" in add|rm|check|commit|links|status|git|rebuild) if [[ ! -e "$SYNCREPO/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	usagehelp && exit 1
 fi;; esac
@@ -279,6 +307,9 @@ fi;; esac
 case "$MAINARG" in
 	setup)
 		sync_setup "$1";;
+	rebuild)
+		sync_rebuild
+		;;
 	add|rm|check)
 		while : ; do
 			#calculate resolved non-repo path
