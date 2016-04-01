@@ -180,9 +180,10 @@ function is_in_repo {
 function add_clone_link {
 	local ORIGINAL="$1" LINK="$2"
 
-	( ln --symbolic -- "$ORIGINAL" "$LINK" \
-	&& chown --no-dereference --reference="$ORIGINAL" --verbose -- "$LINK" \
-	&& chmod --reference="$ORIGINAL" --changes -- "$LINK" \
+	( echo -n "Creating link: " >&9 \
+	&& ln --symbolic --verbose -- "$ORIGINAL" "$LINK" >&9 \
+	&& chown --no-dereference --reference="$ORIGINAL" --verbose -- "$LINK" >&9 \
+	&& chmod --reference="$ORIGINAL" --changes -- "$LINK" >&9 \
 	&& return 0 ) || return 1
 }
 
@@ -202,12 +203,12 @@ function sync_add {
 			SUCCESSMESSAGE="File sync added."
 		fi
 
-		OUTPUT+="$( rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" \
-			&& rm --recursive --verbose -- "$PASSED" \
-			&& echo "Relinking former location..." \
-			&& add_clone_link "$TARGET" "$PASSED" \
-			&& add_to_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
-			&& echo "$SUCCESSMESSAGE" )"
+		rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" >&9 \
+		&& rm --recursive --verbose -- "$PASSED" >&9 \
+		&& echo "Relinking former location..." >&9 \
+		&& add_clone_link "$TARGET" "$PASSED" \
+		&& add_to_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
+		&& echo "$SUCCESSMESSAGE" >&9
 	else
 		errecho "ERROR, source directory or file not found"
 	fi
@@ -224,24 +225,22 @@ function sync_rm {
 		errecho "ERROR, no symlink encountered"
 		errecho "WARNING: $SYNCREPO/$LINKINDEX corrupt. Link missing!"
 	else
-		OUTPUT+="$( rm --verbose "$PASSED" \
-			&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" \
-			&& rm -r --verbose "$REPODATA" \
-			&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
-			&& echo "Restored at original location." )"
+		rm --verbose "$PASSED" >&9 \
+		&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" >&9 \
+		&& rm -r --verbose "$REPODATA" >&9 \
+		&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
+		&& echo "Restored at original location." >&9
 	fi
 }
 
 function sync_commit {
-	OUTPUT+="$(
-		cd "$SYNCREPO"
-		save_permissions
-		git add --all
+	cd "$SYNCREPO"
+	save_permissions
+	git add --all
 
-		MSG="System update: $( git diff --staged --stat | tail -n1 )"
-		if [[ ! -z "$1" ]]; then MSG="$1"; fi
-		git commit -m "$MSG"
-	)"
+	MSG="System update: $( git diff --staged --stat | tail -n1 )"
+	if [[ ! -z "$1" ]]; then MSG="$1"; fi
+	git commit -m "$MSG"
 }
 
 function sync_show_index {
@@ -253,11 +252,10 @@ function sync_status {
 }
 
 function sync_check {
-	VERBOSE="yes"
 	if is_in_repo "$1"; then
-		OUTPUT+="In ssync repository. "
+		echo "In ssync repository."
 	else
-		OUTPUT+="Not in repository. "
+		echo "Not in repository."
 	fi
 }
 
@@ -275,15 +273,15 @@ function save_permissions {
 function restore_permissions {
 	local MOD USER GROUP LOCATION
 
-	echo "Updating permissions..."
+	echo "Adjusting permissions..."
 	while IFS=: read -r MOD USER GROUP LOCATION; do
 		LOCATION="$SYNCREPO/files$LOCATION"
 		if [[ -e "$LOCATION" ]]; then
 			if [[ "$USER:$GROUP" != "$(stat --printf="%U:%G" "$LOCATION")" ]]; then
-				chown --changes -- "$USER:$GROUP" "$LOCATION"
+				chown --changes -- "$USER:$GROUP" "$LOCATION" >&9
 			fi
 			if [[ "$MOD" != "$(stat --printf="%04a" "$LOCATION")" ]]; then
-				chmod --changes "$MOD" "$LOCATION"
+				chmod --changes "$MOD" "$LOCATION" >&9
 			fi
 		else
 			errecho "$LOCATION not found, permission restore failed."
@@ -305,33 +303,32 @@ function sync_fix {
 	echo "Checking local repository against index..."
 	while read -u 3 LOCATION; do
 		TARGET="$SYNCREPO/files$LOCATION"
-		echo -n "$LOCATION => "
+		echo -n "$LOCATION => " >&9
 		if [[ -L "$LOCATION" ]]; then
 			REALLOCATION="$(realpath --quiet --canonicalize-missing "$LOCATION")"
 			if [[ "$REALLOCATION" == "$SYNCREPO/files/"* ]]; then
-				#in repo, all fine
-				echo "ok"
+				echo "ok" >&9
 			else
-				echo "LINK CONFLICT!"
+				echo "LINK CONFLICT!" >&9
 				errecho "The indexed symlink is not pointing to the repository as expected: $LOCATION"
 				if ask_confirm "Delete existing symlink and link to repository instead?"; then
 					( rm -- "$LOCATION" \
-					&& add_clone_link "$TARGET" "$LOCATION" > /dev/null ) \
-					|| ( echo "Correcting link failed." && ((PROBLEMS++)) )
+					&& add_clone_link "$TARGET" "$LOCATION" ) \
+					|| ( errecho "Correcting link failed." && ((PROBLEMS++)) )
 				else ((PROBLEMS++)); fi
 			fi
 		elif [[ -e "$LOCATION" ]]; then
-			echo "CONTENT CONFLICT!"
+			echo "CONTENT CONFLICT!" >&9
 			errecho "Symlink to repository expected but file/folder found: $LOCATION"
 			if ask_confirm "Delete existing file/folder and link to repository instead?"; then
 				( rm -i -- "$LOCATION" && [[ ! -e "$LOCATION" ]] \
-				&& add_clone_link "$TARGET" "$LOCATION" > /dev/null ) \
-				|| ( echo "Linking failed." && ((PROBLEMS++)) )
+				&& add_clone_link "$TARGET" "$LOCATION" ) \
+				|| ( errecho "Linking failed." && ((PROBLEMS++)) )
 			else ((PROBLEMS++)); fi
 		else
-			echo "adding..."
-			add_clone_link "$TARGET" "$LOCATION" > /dev/null \
-			|| ( echo "Adding link failed." && ((PROBLEMS++)) )
+			echo "adding..." >&9
+			add_clone_link "$TARGET" "$LOCATION" \
+			|| ( errecho "Adding link failed." && ((PROBLEMS++)) )
 		fi
 	done 3<"$SYNCREPO/$LINKINDEX"
 
@@ -346,12 +343,14 @@ function sync_fix {
 
 #MAIN FLOW
 
+#file descriptor #9 is our verbose output, all superfluous information goes there
 if [[ "$1" == "verbose" ]]; then
 	shift
-	VERBOSE="yes"
+	exec 9>&1
+else
+	exec 9>/dev/null
 fi
 
-OUTPUT=""
 MAINARG="$1"
 shift
 
