@@ -294,9 +294,8 @@ function restore_permissions {
 function ask_confirm {
 	local MESSAGE="$1" ANSWER
 	while [[ ! "$ANSWER" =~ ^[yYnN]$ ]]; do
-		read -r -n 1 -p "$MESSAGE [y/n]: " -u 3 ANSWER
-		echo
-	done 3<&0
+		read -r -n 1 -p "$MESSAGE [y/n]: " ANSWER && echo
+	done
 	if [[ "$ANSWER" =~ ^[yY]$ ]]; then return 0; else return 1; fi
 }
 
@@ -304,7 +303,7 @@ function sync_fix {
 	local LOCATION TARGET REALLOCATION PROBLEMS=0
 
 	echo "Checking local repository against index..."
-	while read LOCATION; do
+	while read -u 3 LOCATION; do
 		TARGET="$SYNCREPO/files$LOCATION"
 		echo -n "$LOCATION => "
 		if [[ -L "$LOCATION" ]]; then
@@ -317,7 +316,7 @@ function sync_fix {
 				errecho "The indexed symlink is not pointing to the repository as expected: $LOCATION"
 				if ask_confirm "Delete existing symlink and link to repository instead?"; then
 					( rm -- "$LOCATION" \
-					&& add_clone_link "$TARGET" "$LOCATION" ) \
+					&& add_clone_link "$TARGET" "$LOCATION" > /dev/null ) \
 					|| ( echo "Correcting link failed." && ((PROBLEMS++)) )
 				else ((PROBLEMS++)); fi
 			fi
@@ -326,20 +325,22 @@ function sync_fix {
 			errecho "Symlink to repository expected but file/folder found: $LOCATION"
 			if ask_confirm "Delete existing file/folder and link to repository instead?"; then
 				( rm -i -- "$LOCATION" && [[ ! -e "$LOCATION" ]] \
-				&& add_clone_link "$TARGET" "$LOCATION" ) \
+				&& add_clone_link "$TARGET" "$LOCATION" > /dev/null ) \
 				|| ( echo "Linking failed." && ((PROBLEMS++)) )
 			else ((PROBLEMS++)); fi
 		else
 			echo "adding..."
-			add_clone_link "$TARGET" "$LOCATION" \
+			add_clone_link "$TARGET" "$LOCATION" > /dev/null \
 			|| ( echo "Adding link failed." && ((PROBLEMS++)) )
 		fi
-	done <"$SYNCREPO/$LINKINDEX"
+	done 3<"$SYNCREPO/$LINKINDEX"
 
 	restore_permissions
 
 	if (( $PROBLEMS > 0 )); then
-		errecho "\n[!] WARNING: $PROBLEMS problems unresolved and remaining. Re-run \"ssync fix\" to check again."
+		errecho "[!] WARNING: $PROBLEMS problem(s) unresolved and remaining. Re-run \"ssync fix\" to check again."
+	else
+		echo "[i] Repository state clean."
 	fi
 }
 
