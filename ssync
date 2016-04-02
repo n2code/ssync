@@ -63,6 +63,12 @@ COMMANDS:
     commit [MESSAGE]
           Bundle changes in a commit for synchronization.
 
+    update
+          Fetch latest changes from central repository and merge them.
+
+    publish
+          Publish local changes/merges. Automatically updates first.
+
     links
           List paths of all repository elements.
 
@@ -76,9 +82,15 @@ function gpg_enabled {
 
 function gpg_check {
 	local testedref="$1"
-	if gpg_enabled && ! git verify-commit "$testedref"; then
-		errecho "########## GPG TRUST FAIL! ##########" && exit 1
+
+	if gpg_enabled; then
+		echo "GPG check for $testedref..."
+		if ! git verify-commit "$testedref" 2>&1; then
+			errecho "########## GPG TRUST FAIL! ##########"
+			exit 1
+		fi
 	fi
+	return 0
 }
 
 function sync_setup {
@@ -131,6 +143,10 @@ function sync_setup {
 	git config user.name "$gituser"
 	git config user.email "$gitemail"
 	git config push.default matching
+	#Versioning files exactly as-is, apart from file (handled by permission restoration)
+	git config core.autocrlf false
+	git config core.whitespace ""
+	git config core.fileMode false
 	if gpg_enabled; then
 		git config user.signingkey "$gpgkey"
 		git config commit.gpgsign true
@@ -273,7 +289,24 @@ function sync_show_index {
 }
 
 function sync_status {
-	cd "$syncrepo" && git --no-pager diff "$linkindex" | grep -E "^[+-]/.+$" | LC_ALL=C sort
+	local changes
+
+	cd "$syncrepo"
+	changes="$(git --no-pager diff "$linkindex" | grep -E "^[+-]/.+$" | LC_ALL=C sort)"
+	if [[ -z "$changes" ]]; then
+		if [[ ! -z "$(git status --porcelain)" ]]; then
+			echo "There are uncommitted file changes. (for details: ssync git status)"
+			return 1
+		elif ! is_repo_clean; then
+			echo "There are uncommitted permission changes but no file changes."
+			return 1
+		else
+			echo "No uncommitted changes."
+			return 0
+		fi
+	else
+		echo "$changes"
+	fi
 }
 
 function sync_check {
@@ -374,6 +407,52 @@ function sync_log {
 	cd "$syncrepo" && git log --graph --abbrev-commit --decorate --date-order --date=relative --format=format:'%C(bold blue)%h %C(bold green)(%ar) %C(bold yellow)%d %C(white)%s %C(dim white)- %an%C(reset)' --all
 }
 
+function is_repo_clean {
+	cd "$syncrepo"
+	save_permissions
+	if [[ -z "$(git status --porcelain)" ]]; then return 0; else return 1; fi
+}
+
+function check_repo_clean {
+	if is_repo_clean; then
+		return 0
+	else
+		errecho "[!] Aborting operation. Repository is not clean, see: ssync status"
+		exit 1
+	fi
+}
+
+function sync_update {
+	local verify
+	if gpg_enabled; then verify="--verify-signatures"; fi
+
+	if [[ -e "$syncrepo/.git/MERGE_HEAD" ]]; then
+		errecho "[!] Merge not complete. Fix and run: ssync commit"
+		return 1
+	else
+		cd "$syncrepo" \
+		&& git fetch origin \
+		&& check_repo_clean \
+		&& git checkout "$machinebranch" \
+		&& gpg_check "$machinebranch" \
+		&& gpg_check "$syncbranch" \
+		&& { git merge --ff $verify "$syncbranch" && echo "[i] Updated from central repository." && return 0; } \
+		|| { errecho "[!] Merge needs manual intervention. Do so and run: ssync commit" && return 1; }
+	fi
+}
+
+function sync_publish {
+	cd "$syncrepo" \
+	&& echo "Updating..." \
+	&& sync_update > /dev/null \
+	&& echo "Publishing..." \
+	&& gpg_check "$machinebranch" \
+	&& git branch -f "$syncbranch" "$machinebranch" \
+	&& git push origin "$syncbranch" \
+	&& echo "[i] Published changes."
+}
+
+
 #MAIN FLOW
 
 #file descriptor #9 is our verbose output, all superfluous information goes there
@@ -425,6 +504,10 @@ case "$mainarg" in
 		sync_status;;
 	log)
 		sync_log;;
+	update)
+		sync_update;;
+	publish)
+		sync_publish;;
 	git)
 		case "$1" in
 			add|rm|commit)
@@ -439,7 +522,7 @@ case "$mainarg" in
 				shift
 				;;
 			*)
-				cd "$syncrepo" && git "$@"
+				cd "$syncrepo/files" && git "$@"
 				;;
 		esac
 		;;
