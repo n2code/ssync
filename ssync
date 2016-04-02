@@ -305,7 +305,8 @@ function sync_status {
 			return 0
 		fi
 	else
-		echo "$changes"
+		echo -e "Links have changed:\n$changes"
+		return 1
 	fi
 }
 
@@ -510,19 +511,17 @@ case "$mainarg" in
 		sync_publish;;
 	git)
 		case "$1" in
-			add|rm|commit)
-				errecho "Please use the designated ssync commands instead of git $1"
-				helphint && exit 1
-				;;
-			mv|clean)
-				errecho "You should avoid these commands to keep ssync working properly.\nIf you are sure about what you are doing, specify an override:\n    ssync git override $1 ..."
-				exit 1
-				;;
 			override)
 				shift
+				;&
+			diff|log|shortlog|show|status)
+				git "$@"
 				;;
 			*)
-				cd "$syncrepo/files" && git "$@"
+				errecho "AVOID THESE GIT COMMANDS TO KEEP SSYNC WORKING PROPERLY.\nUse the designated ssync commands instead:"
+				helphint
+				errecho "If you are absolutely sure about what you are doing:\n    ssync git override $1 ..."
+				exit 1
 				;;
 		esac
 		;;
