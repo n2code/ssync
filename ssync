@@ -10,15 +10,15 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 
-SCRIPT="${BASH_SOURCE[0]}"
-if [[ -L "$SCRIPT" ]]; then SCRIPT="$( readlink -ms "$SCRIPT" )"; fi
-DIR="$( dirname "$SCRIPT" )"
+script="${BASH_SOURCE[0]}"
+if [[ -L "$script" ]]; then script="$( readlink -ms "$script" )"; fi
+dir="$( dirname "$script" )"
 
-if ( test ! -f "$DIR/settings.inc" ) || ( cmp -s "$DIR/settings.inc.template" "$DIR/settings.inc" >/dev/null ); then
-	cp "$DIR/settings.inc.template" "$DIR/settings.inc"
-	if [[ ! -e "/usr/local/bin/ssync" ]]; then ln -s "$DIR/ssync" "/usr/local/bin/ssync"; fi
+if ( test ! -f "$dir/settings.inc" ) || ( cmp -s "$dir/settings.inc.template" "$dir/settings.inc" >/dev/null ); then
+	cp "$dir/settings.inc.template" "$dir/settings.inc"
+	if [[ ! -e "/usr/local/bin/ssync" ]]; then ln -s "$dir/ssync" "/usr/local/bin/ssync"; fi
 	echo "Welcome to ssync!
-A default configuration was copied to $DIR/settings.inc
+A default configuration was copied to $dir/settings.inc
 Edit this file and restart this setup by using
     ssync setup
 to pull the ssync repository from GITURL or even
@@ -27,9 +27,9 @@ for first use of this tool ever (this initializes a fresh repo and pushes it ups
 	exit 1
 fi
 
-source "$DIR/settings.inc"
-PERMFILE="ssync-file-permissions"
-LINKINDEX="ssync-linkindex"
+source "$dir/settings.inc"
+permfile="ssync-file-permissions"
+linkindex="ssync-linkindex"
 
 function helphint {
 	errecho " => ssync help"
@@ -76,54 +76,54 @@ function sync_setup {
 		echo "SYSTEMSYNC-REPO-CREATION"
 		echo "########################"
 
-		TEMPREPO="$(mktemp -d)"
-		cd "$TEMPREPO"
-		touch "$PERMFILE" "$LINKINDEX"
+		temprepo="$(mktemp -d)"
+		cd "$temprepo"
+		touch "$permfile" "$linkindex"
 		git init .
 		git config user.name "ssync"
 		git config user.email "ssync@localhost"
 		git add --all
 		git commit -m "initialized ssync repository"
-		git remote add origin "$GITURL"
+		git remote add origin "$giturl"
 		git push -u origin master || ( errecho "Upload failed, aborting setup." && exit 1 )
 
-		rm -r "$TEMPREPO"
+		rm -r "$temprepo"
 	fi
 
 	echo "SYSTEMSYNC-SETUP"
 	echo "################"
-	cd "$DIR"
+	cd "$dir"
 
 	echo "Cloning system config repo..."
-	if ! git clone "$GITURL" "$SYNCREPO"; then
+	if ! git clone "$giturl" "$syncrepo"; then
 		errecho "CLONE FAILED." && exit 1
 	fi
 
 	echo "Setting up hooks..."
-	echo -e "#!/bin/bash\n$DIR/ssync fix" > "$SYNCREPO/.git/hooks/post-checkout"
-	chmod u+x "$SYNCREPO/.git/hooks/post-checkout"
-	cp "$SYNCREPO/.git/hooks/post-checkout" "$SYNCREPO/.git/hooks/post-merge"
+	echo -e "#!/bin/bash\n$dir/ssync fix" > "$syncrepo/.git/hooks/post-checkout"
+	chmod u+x "$syncrepo/.git/hooks/post-checkout"
+	cp "$syncrepo/.git/hooks/post-checkout" "$syncrepo/.git/hooks/post-merge"
 
 	echo "(Re)Linking ssync in /usr/local/bin ..."
 	rm "/usr/local/bin/ssync" 2> /dev/null
-	ln -s "$DIR/ssync" "/usr/local/bin/ssync"
+	ln -s "$dir/ssync" "/usr/local/bin/ssync"
 
 	echo "Setting up local repository..."
-	cd "$SYNCREPO"
-	git config user.name "$GITUSER"
-	git config user.email "$GITEMAIL"
+	cd "$syncrepo"
+	git config user.name "$gituser"
+	git config user.email "$gitemail"
 	git config push.default matching
-	git checkout -f "$GITBRANCH"
+	git checkout -f "$gitbranch"
 
 	echo "################"
 	echo "Setup complete."
 }
 
 function is_indexed {
-	local MATCHES
+	local matches
 
-	MATCHES="$(grep --count --fixed-strings --line-regexp "$2" "$1")"
-	case "$MATCHES" in
+	matches="$(grep --count --fixed-strings --line-regexp "$2" "$1")"
+	case "$matches" in
 		"0") return 42;;
 		"1") return 0;;
 		*) errecho "WARNING: $1 corrupt. Duplicate entries!"; return 0;;
@@ -131,124 +131,124 @@ function is_indexed {
 }
 
 function add_to_index {
-	local INDEXFILE="$1" LOCATION="$2"
+	local indexfile="$1" location="$2"
 
-	if is_indexed "$INDEXFILE" "$LOCATION"; then
+	if is_indexed "$indexfile" "$location"; then
 		errecho "WARNING: Attempt to add already index entry to $1"
 	else
-		echo "$LOCATION" | LC_ALL=C sort -o "$INDEXFILE" - "$INDEXFILE"
+		echo "$location" | LC_ALL=C sort -o "$indexfile" - "$indexfile"
 	fi
 }
 
 function remove_from_index {
-	local INDEXFILE="$1" LOCATION="$2"
+	local indexfile="$1" location="$2"
 
-	if ! is_indexed "$INDEXFILE" "$LOCATION"; then
-		errecho "WARNING: Attempt to remove non-indexed entry from $INDEXFILE"
+	if ! is_indexed "$indexfile" "$location"; then
+		errecho "WARNING: Attempt to remove non-indexed entry from $indexfile"
 	else
-		cp -a "$INDEXFILE" "$INDEXFILE.tmp"
-		grep --invert-match --fixed-strings --line-regexp "$LOCATION" "$INDEXFILE.tmp" > "$INDEXFILE"
-		rm "$INDEXFILE.tmp"
+		cp -a "$indexfile" "$indexfile.tmp"
+		grep --invert-match --fixed-strings --line-regexp "$location" "$indexfile.tmp" > "$indexfile"
+		rm "$indexfile.tmp"
 	fi
 }
 
 function is_child_of {
-	local CHILD PARENT REDUCED
+	local child parent reduced
 
 	#resolve links
-	CHILD="$(readlink -m "$1")"
-	PARENT="$(readlink -m "$2")"
+	child="$(readlink -m "$1")"
+	parent="$(readlink -m "$2")"
 	
 	#strip repo if currently synced
-	CHILD="${CHILD##"$SYNCREPO/files"}"
-	PARENT="${PARENT##"$SYNCREPO/files"}"
+	child="${child##"$syncrepo/files"}"
+	parent="${parent##"$syncrepo/files"}"
 
 	#remove base from path and see if path has changed (check for starting slash to account for partial directory names having been removed)
-	REDUCED="${CHILD##"$PARENT"}"
-	if [[ "$REDUCED" != "$CHILD" ]] && [[ "$REDUCED" == /* ]]; then return 0; else return 1; fi
+	reduced="${child##"$parent"}"
+	if [[ "$reduced" != "$child" ]] && [[ "$reduced" == /* ]]; then return 0; else return 1; fi
 }
 
 function is_in_repo {
-	local TESTED="$1" LINE
+	local tested="$1" line
 
-	while read LINE; do
-		if [[ "$TESTED" == "$LINE" ]] || is_child_of "$TESTED" "$LINE"; then return 0; fi
-	done <"$SYNCREPO/$LINKINDEX"
+	while read line; do
+		if [[ "$tested" == "$line" ]] || is_child_of "$tested" "$line"; then return 0; fi
+	done <"$syncrepo/$linkindex"
 	return 1
 }
 
 function add_clone_link {
-	local ORIGINAL="$1" LINK="$2"
+	local original="$1" link="$2"
 
 	( echo -n "Creating link: " >&9 \
-	&& ln --symbolic --verbose -- "$ORIGINAL" "$LINK" >&9 \
-	&& chown --no-dereference --reference="$ORIGINAL" --verbose -- "$LINK" >&9 \
-	&& chmod --reference="$ORIGINAL" --changes -- "$LINK" >&9 \
+	&& ln --symbolic --verbose -- "$original" "$link" >&9 \
+	&& chown --no-dereference --reference="$original" --verbose -- "$link" >&9 \
+	&& chmod --reference="$original" --changes -- "$link" >&9 \
 	&& return 0 ) || return 1
 }
 
 function sync_add {
-	local PASSED="$1" TARGET
+	local passed="$1" target
 
-	TARGET="$SYNCREPO/files$PASSED"
+	target="$syncrepo/files$passed"
 
-	if is_in_repo "$PASSED"; then
-		errecho "ERROR, already part of repository $SYNCREPO"
-	elif [[ -L "$PASSED" ]]; then
+	if is_in_repo "$passed"; then
+		errecho "ERROR, already part of repository $syncrepo"
+	elif [[ -L "$passed" ]]; then
 		errecho "ERROR, symlinks cannot be synced"
-	elif [[ -e "$PASSED" && ( -d "$PASSED" || -f "$PASSED" ) ]]; then
-		if [[ -d "$PASSED" ]]; then
-			SUCCESSMESSAGE="Directory sync added."
-		elif [[ -f "$PASSED" ]]; then
-			SUCCESSMESSAGE="File sync added."
+	elif [[ -e "$passed" && ( -d "$passed" || -f "$passed" ) ]]; then
+		if [[ -d "$passed" ]]; then
+			successmessage="Directory sync added."
+		elif [[ -f "$passed" ]]; then
+			successmessage="File sync added."
 		fi
 
-		rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$PASSED/" "$SYNCREPO/files/" >&9 \
-		&& rm --recursive --verbose -- "$PASSED" >&9 \
+		rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$passed/" "$syncrepo/files/" >&9 \
+		&& rm --recursive --verbose -- "$passed" >&9 \
 		&& echo "Relinking former location..." >&9 \
-		&& add_clone_link "$TARGET" "$PASSED" \
-		&& add_to_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
-		&& echo "$SUCCESSMESSAGE" >&9
+		&& add_clone_link "$target" "$passed" \
+		&& add_to_index "$syncrepo/$linkindex" "$passed" \
+		&& echo "$successmessage" >&9
 	else
 		errecho "ERROR, source directory or file not found"
 	fi
 }
 
 function sync_rm {
-	local PASSED="$1" REPODATA
+	local passed="$1" repodata
 
-	REPODATA="$SYNCREPO/files$PASSED"
+	repodata="$syncrepo/files$passed"
 
-	if ! is_indexed "$SYNCREPO/$LINKINDEX" "$PASSED"; then
+	if ! is_indexed "$syncrepo/$linkindex" "$passed"; then
 		errecho "ERROR, no repository link (see: ssync links)"
-	elif [[ ! -L "$PASSED" ]]; then
+	elif [[ ! -L "$passed" ]]; then
 		errecho "ERROR, no symlink encountered"
-		errecho "WARNING: $SYNCREPO/$LINKINDEX corrupt. Link missing!"
+		errecho "WARNING: $syncrepo/$linkindex corrupt. Link missing!"
 	else
-		rm --verbose "$PASSED" >&9 \
-		&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$SYNCREPO/files/.$PASSED" "/" >&9 \
-		&& rm -r --verbose "$REPODATA" >&9 \
-		&& remove_from_index "$SYNCREPO/$LINKINDEX" "$PASSED" \
+		rm --verbose "$passed" >&9 \
+		&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$syncrepo/files/.$passed" "/" >&9 \
+		&& rm -r --verbose "$repodata" >&9 \
+		&& remove_from_index "$syncrepo/$linkindex" "$passed" \
 		&& echo "Restored at original location." >&9
 	fi
 }
 
 function sync_commit {
-	cd "$SYNCREPO"
+	cd "$syncrepo"
 	save_permissions
 	git add --all
 
-	MSG="System update: $( git diff --staged --stat | tail -n1 )"
-	if [[ ! -z "$1" ]]; then MSG="$1"; fi
-	git commit -m "$MSG"
+	msg="System update: $( git diff --staged --stat | tail -n1 )"
+	if [[ ! -z "$1" ]]; then msg="$1"; fi
+	git commit -m "$msg"
 }
 
 function sync_show_index {
-	cat "$SYNCREPO/$LINKINDEX"
+	cat "$syncrepo/$linkindex"
 }
 
 function sync_status {
-	cd "$SYNCREPO" && git --no-pager diff "$LINKINDEX" | grep -E "^[+-]/.+$" | LC_ALL=C sort
+	cd "$syncrepo" && git --no-pager diff "$linkindex" | grep -E "^[+-]/.+$" | LC_ALL=C sort
 }
 
 function sync_check {
@@ -260,86 +260,86 @@ function sync_check {
 }
 
 function save_permissions {
-	local LINE HIT
+	local line hit
 
-	while read LINE; do
-		HIT="${LINE##"$SYNCREPO/files"}"
-		if is_in_repo "$HIT"; then
-			echo "$(stat --printf="%04a:%U:%G" "$LINE"):$HIT"
+	while read line; do
+		hit="${line##"$syncrepo/files"}"
+		if is_in_repo "$hit"; then
+			echo "$(stat --printf="%04a:%U:%G" "$line"):$hit"
 		fi
-	done < <(find "$SYNCREPO/files" -mindepth 1 | LC_ALL=C sort) > "$SYNCREPO/$PERMFILE"
+	done < <(find "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
 }
 
 function restore_permissions {
-	local MOD USER GROUP LOCATION
+	local mod user group location
 
 	echo "Adjusting permissions..."
-	while IFS=: read -r MOD USER GROUP LOCATION; do
-		LOCATION="$SYNCREPO/files$LOCATION"
-		if [[ -e "$LOCATION" ]]; then
-			if [[ "$USER:$GROUP" != "$(stat --printf="%U:%G" "$LOCATION")" ]]; then
-				chown --changes -- "$USER:$GROUP" "$LOCATION" >&9
+	while IFS=: read -r mod user group location; do
+		location="$syncrepo/files$location"
+		if [[ -e "$location" ]]; then
+			if [[ "$user:$group" != "$(stat --printf="%U:%G" "$location")" ]]; then
+				chown --changes -- "$user:$group" "$location" >&9
 			fi
-			if [[ "$MOD" != "$(stat --printf="%04a" "$LOCATION")" ]]; then
-				chmod --changes "$MOD" "$LOCATION" >&9
+			if [[ "$mod" != "$(stat --printf="%04a" "$location")" ]]; then
+				chmod --changes "$mod" "$location" >&9
 			fi
 		else
-			errecho "$LOCATION not found, permission restore failed."
+			errecho "$location not found, permission restore failed."
 		fi
-	done < "$SYNCREPO/$PERMFILE"
+	done < "$syncrepo/$permfile"
 }
 
 function ask_confirm {
-	local MESSAGE="$1" ANSWER
-	while [[ ! "$ANSWER" =~ ^[yYnN]$ ]]; do
-		if ! read -r -n 1 -p "$MESSAGE [y/n]: " -t 99 ANSWER; then
-			ANSWER="n"
-			echo -n "$ANSWER (chosen by timeout)"
+	local message="$1" answer
+	while [[ ! "$answer" =~ ^[yYnN]$ ]]; do
+		if ! read -r -n 1 -p "$message [y/n]: " -t 99 answer; then
+			answer="n"
+			echo -n "$answer (chosen by timeout)"
 		fi
 		echo
 	done
-	if [[ "$ANSWER" =~ ^[yY]$ ]]; then return 0; else return 1; fi
+	if [[ "$answer" =~ ^[yY]$ ]]; then return 0; else return 1; fi
 }
 
 function sync_fix {
-	local LOCATION TARGET REALLOCATION PROBLEMS=0
+	local location target reallocation problems=0
 
 	echo "Checking local repository against index..."
-	while read -u 3 LOCATION; do
-		TARGET="$SYNCREPO/files$LOCATION"
-		echo -n "$LOCATION => " >&9
-		if [[ -L "$LOCATION" ]]; then
-			REALLOCATION="$(realpath --quiet --canonicalize-missing "$LOCATION")"
-			if [[ "$REALLOCATION" == "$SYNCREPO/files/"* ]]; then
+	while read -u 3 location; do
+		target="$syncrepo/files$location"
+		echo -n "$location => " >&9
+		if [[ -L "$location" ]]; then
+			reallocation="$(realpath --quiet --canonicalize-missing "$location")"
+			if [[ "$reallocation" == "$syncrepo/files/"* ]]; then
 				echo "ok" >&9
 			else
 				echo "LINK CONFLICT!" >&9
-				errecho "The indexed symlink is not pointing to the repository as expected: $LOCATION"
+				errecho "The indexed symlink is not pointing to the repository as expected: $location"
 				if ask_confirm "Delete existing symlink and link to repository instead?"; then
-					( rm -- "$LOCATION" \
-					&& add_clone_link "$TARGET" "$LOCATION" ) \
-					|| ( errecho "Correcting link failed." && ((PROBLEMS++)) )
-				else ((PROBLEMS++)); fi
+					( rm -- "$location" \
+					&& add_clone_link "$target" "$location" ) \
+					|| ( errecho "Correcting link failed." && ((problems++)) )
+				else ((problems++)); fi
 			fi
-		elif [[ -e "$LOCATION" ]]; then
+		elif [[ -e "$location" ]]; then
 			echo "CONTENT CONFLICT!" >&9
-			errecho "Symlink to repository expected but file/folder found: $LOCATION"
+			errecho "Symlink to repository expected but file/folder found: $location"
 			if ask_confirm "Delete existing file/folder and link to repository instead?"; then
-				( rm -i -- "$LOCATION" && [[ ! -e "$LOCATION" ]] \
-				&& add_clone_link "$TARGET" "$LOCATION" ) \
-				|| ( errecho "Linking failed." && ((PROBLEMS++)) )
-			else ((PROBLEMS++)); fi
+				( rm -i -- "$location" && [[ ! -e "$location" ]] \
+				&& add_clone_link "$target" "$location" ) \
+				|| ( errecho "Linking failed." && ((problems++)) )
+			else ((problems++)); fi
 		else
 			echo "adding..." >&9
-			add_clone_link "$TARGET" "$LOCATION" \
-			|| ( errecho "Adding link failed." && ((PROBLEMS++)) )
+			add_clone_link "$target" "$location" \
+			|| ( errecho "Adding link failed." && ((problems++)) )
 		fi
-	done 3<"$SYNCREPO/$LINKINDEX"
+	done 3<"$syncrepo/$linkindex"
 
 	restore_permissions
 
-	if (( $PROBLEMS > 0 )); then
-		errecho "[!] WARNING: $PROBLEMS problem(s) unresolved and remaining. Re-run \"ssync fix\" to check again."
+	if (( $problems > 0 )); then
+		errecho "[!] WARNING: $problems problem(s) unresolved and remaining. Re-run \"ssync fix\" to check again."
 	else
 		echo "[i] Repository state clean."
 	fi
@@ -355,15 +355,15 @@ else
 	exec 9>/dev/null
 fi
 
-MAINARG="$1"
+mainarg="$1"
 shift
 
-case "$MAINARG" in add|rm|check|commit|links|status|git|fix) if [[ ! -e "$SYNCREPO/.git" ]]; then
+case "$mainarg" in add|rm|check|commit|links|status|git|fix) if [[ ! -e "$syncrepo/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	helphint && exit 1
 fi;; esac
 
-case "$MAINARG" in
+case "$mainarg" in
 	setup)
 		sync_setup "$1";;
 	fix)
@@ -371,18 +371,18 @@ case "$MAINARG" in
 	add|rm|check)
 		while : ; do
 			#calculate resolved non-repo path
-			FULLPATH="$(realpath --quiet --canonicalize-missing --no-symlinks "$1")"
-			FULLPATH="${FULLPATH##"$SYNCREPO/files"}"
+			fullpath="$(realpath --quiet --canonicalize-missing --no-symlinks "$1")"
+			fullpath="${fullpath##"$syncrepo/files"}"
 
-			if [[ -z "$FULLPATH" ]]; then
+			if [[ -z "$fullpath" ]]; then
 				errecho "ERROR, no path given!"
 				helphint && exit 1
 			fi
 
-			case "$MAINARG" in
-				add) sync_add "$FULLPATH";;
-				rm) sync_rm "$FULLPATH";;
-				check) sync_check "$FULLPATH";;
+			case "$mainarg" in
+				add) sync_add "$fullpath";;
+				rm) sync_rm "$fullpath";;
+				check) sync_check "$fullpath";;
 			esac
 			shift
 			[[ "$1" ]] || break
@@ -408,7 +408,7 @@ case "$MAINARG" in
 				shift
 				;;
 			*)
-				cd "$SYNCREPO" && git "$@"
+				cd "$syncrepo" && git "$@"
 				;;
 		esac
 		;;
@@ -416,7 +416,4 @@ case "$MAINARG" in
 		usagehelp;;
 esac
 
-if [[ "$VERBOSE" == "yes" ]]; then
-	echo "$OUTPUT"
-fi
-#EOF
+#End Of Script :)
