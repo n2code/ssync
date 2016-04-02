@@ -370,6 +370,10 @@ function sync_fix {
 	fi
 }
 
+function sync_log {
+	cd "$syncrepo" && git log --graph --abbrev-commit --decorate --date-order --date=relative --format=format:'%C(bold blue)%h %C(bold green)(%ar) %C(bold yellow)%d %C(white)%s %C(dim white)- %an%C(reset)' --all
+}
+
 #MAIN FLOW
 
 #file descriptor #9 is our verbose output, all superfluous information goes there
@@ -383,7 +387,7 @@ fi
 mainarg="$1"
 shift
 
-case "$mainarg" in add|rm|check|commit|links|status|git|fix) if [[ ! -e "$syncrepo/.git" ]]; then
+case "$mainarg" in add|rm|check|commit|links|status|git|fix|log) if [[ ! -e "$syncrepo/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	helphint && exit 1
 fi;; esac
@@ -419,6 +423,8 @@ case "$mainarg" in
 		sync_show_index;;
 	status)
 		sync_status;;
+	log)
+		sync_log;;
 	git)
 		case "$1" in
 			add|rm|commit)
@@ -426,7 +432,7 @@ case "$mainarg" in
 				helphint && exit 1
 				;;
 			mv|clean)
-				errecho "You should avoid these commands to keep ssync working properly.\nIf you are sure about what you are doing, specify an override:\n    git override $1 ..."
+				errecho "You should avoid these commands to keep ssync working properly.\nIf you are sure about what you are doing, specify an override:\n    ssync git override $1 ..."
 				exit 1
 				;;
 			override)
