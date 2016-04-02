@@ -1,5 +1,12 @@
+#SSYNC CONFIGURATION
+##Local repository
 syncrepo="/systemsync/repo"
-giturl="https://localhost/systemsync.git"
-gitbranch="master"
 gituser="user"
 gitemail="user@localhost"
+##This machine's branch
+machinebranch="computer1"
+##Central repository location and master branch
+giturl="https://localhost/systemsync.git"
+syncbranch="master"
+#Leave empty to disable signing
+gpgkey="A1B2C3D4"

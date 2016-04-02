@@ -71,6 +71,17 @@ COMMANDS:
           Pipe git command through to underlying git."
 }
 
+function gpg_enabled {
+	if [[ ! -z "$gpgkey" ]]; then return 0; else return 1; fi
+}
+
+function gpg_check {
+	local testedref="$1"
+	if gpg_enabled && ! git verify-commit "$testedref"; then
+		errecho "########## GPG TRUST FAIL! ##########" && exit 1
+	fi
+}
+
 function sync_setup {
 	if [[ "$1" == "new" ]]; then
 		echo "SYSTEMSYNC-REPO-CREATION"
@@ -80,12 +91,18 @@ function sync_setup {
 		cd "$temprepo"
 		touch "$permfile" "$linkindex"
 		git init .
+		git branch "$syncbranch"
+		git checkout "$syncbranch"
 		git config user.name "ssync"
 		git config user.email "ssync@localhost"
+		if gpg_enabled; then
+			git config user.signingkey "$gpgkey"
+			git config commit.gpgsign true
+		fi
 		git add --all
 		git commit -m "initialized ssync repository"
-		git remote add origin "$giturl"
-		git push -u origin master || ( errecho "Upload failed, aborting setup." && exit 1 )
+		git remote add central "$giturl"
+		git push -u central "$syncbranch" || { errecho "Upload failed, aborting setup." && exit 1; }
 
 		rm -r "$temprepo"
 	fi
@@ -95,7 +112,7 @@ function sync_setup {
 	cd "$dir"
 
 	echo "Cloning system config repo..."
-	if ! git clone "$giturl" "$syncrepo"; then
+	if ! git clone --origin origin "$giturl" "$syncrepo"; then
 		errecho "CLONE FAILED." && exit 1
 	fi
 
@@ -113,7 +130,14 @@ function sync_setup {
 	git config user.name "$gituser"
 	git config user.email "$gitemail"
 	git config push.default matching
-	git checkout -f "$gitbranch"
+	if gpg_enabled; then
+		git config user.signingkey "$gpgkey"
+		git config commit.gpgsign true
+	fi
+	git checkout "$syncbranch"
+	git branch "$machinebranch"
+	git checkout "$machinebranch"
+	gpg_check "$machinebranch"
 
 	echo "################"
 	echo "Setup complete."

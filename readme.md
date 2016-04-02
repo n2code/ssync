@@ -10,9 +10,8 @@ The idea is to synchronize multiple machines this way by synchronizing everythin
 
 ## Requirements
 - Dependencies
-  - `git` *- d'oh*
-  - `rsync`
-  - `perl` for [git-preserve-permissions](https://github.com/dr4ke) (pulled automatically)
+  - `git` version 2.X
+  - `rsync` (tested with version 3)
   - GNU's `coreutils`, `bash` version 4
 - Permissions
   - needs to run as **root** to properly deal with file permissions
