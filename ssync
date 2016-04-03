@@ -493,10 +493,10 @@ fi
 mainarg="$1"
 shift
 
-case "$mainarg" in add|rm|check|commit|links|status|git|fix|log) if [[ ! -e "$syncrepo/.git" ]]; then
+if [[ "$mainarg" != "help" && "$mainarg" != "setup" && ! -e "$syncrepo/.git" ]]; then
 	errecho "ERROR: Setup not completed."
 	helphint && exit 1
-fi;; esac
+fi
 
 case "$mainarg" in
 	setup)
