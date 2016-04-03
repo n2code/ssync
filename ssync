@@ -295,6 +295,10 @@ function sync_show_index {
 	cat "$syncrepo/$linkindex"
 }
 
+function is_index_changed {
+	if [[ -z "$(cd "$syncrepo" && git status --porcelain "$linkindex")" ]]; then return 1; else return 0; fi
+}
+
 function sync_status {
 	local changes
 
@@ -471,13 +475,52 @@ function sync_uninstall {
 	echo "This will restore all the content that is currently controlled by ssync and delete the local repository ($syncrepo)."
 	if ask_confirm "Are you ABSOLUTELY sure you want to do this?" && ask_confirm "Seriously, you understand the consequences and want to proceed?"; then
 		if [[ -s "$syncrepo/$linkindex" ]]; then
-			$script verbose rm $(cat "$syncrepo/$linkindex")
+			"$script" verbose rm $(cat "$syncrepo/$linkindex")
 		fi
 		if [[ -s "$syncrepo/$linkindex" ]]; then
 			errecho "\n[!] Something went wrong. Aborting uninstall."
 		else
 			rm -r "$syncrepo" \
 			&& echo "[i] Uninstall successful."
+		fi
+	fi
+}
+
+function check_branch {
+	local expectedbranch="$1"
+
+	if [[ "$(git symbolic-ref --short --quiet HEAD)" == "$expectedbranch" ]]; then
+		return 0
+	else
+		errecho "[!] Aborting operation. Not on branch $expectedbranch as expected."
+		exit 1
+	fi
+}
+
+function sync_reset {
+	cd "$syncrepo"
+	check_branch "$machinebranch"
+
+	if ask_confirm "All uncommitted changes will be lost. Continue?"; then
+		  added="$(git --no-pager diff "$linkindex" | grep --only-matching --color=never -P "^[+]\K/.+$")"
+		removed="$(git --no-pager diff "$linkindex" | grep --only-matching --color=never -P "^[-]\K/.+$")"
+
+		if [[ ! -z "$added"   ]]; then
+			echo -e "Added since commit:\n$added\nRestoring..."
+			"$script" rm  $added
+		fi
+		if [[ ! -z "$removed" ]]; then
+			echo -e "Removed since commit:\n$removed\nRelinking..."
+			"$script" add $removed
+		fi
+
+		if ! is_index_changed; then
+			echo "Resetting git..."
+			git reset --hard "$machinebranch" \
+			&& git checkout --quiet "$machinebranch" \
+			&& echo "[i] Resetted to committed state."
+		else
+			errecho "[!] Reset not completed. Try again."
 		fi
 	fi
 }
@@ -540,6 +583,8 @@ case "$mainarg" in
 		sync_update;;
 	publish)
 		sync_publish;;
+	reset)
+		sync_reset;;
 	git)
 		case "$1" in
 			override)
