@@ -72,6 +72,9 @@ COMMANDS:
     links
           List paths of all repository elements.
 
+    uninstall
+          Restore (see \"rm\" command) all contents and deletes local repository.
+
     git ...
           Pipe git command through to underlying git."
 }
@@ -461,6 +464,21 @@ function sync_publish {
 	&& echo "[i] Published changes."
 }
 
+function sync_uninstall {
+	echo "This will restore all the content that is currently controlled by ssync and delete the local repository ($syncrepo)."
+	if ask_confirm "Are you ABSOLUTELY sure you want to do this?" && ask_confirm "Seriously, you understand the consequences and want to proceed?"; then
+		if [[ -s "$syncrepo/$linkindex" ]]; then
+			$script verbose rm $(cat "$syncrepo/$linkindex")
+		fi
+		if [[ -s "$syncrepo/$linkindex" ]]; then
+			errecho "\n[!] Something went wrong. Aborting uninstall."
+		else
+			rm -r "$syncrepo" \
+			&& echo "[i] Uninstall successful."
+		fi
+	fi
+}
+
 
 #MAIN FLOW
 
@@ -483,6 +501,8 @@ fi;; esac
 case "$mainarg" in
 	setup)
 		sync_setup "$1";;
+	uninstall)
+		sync_uninstall;;
 	fix)
 		sync_fix;;
 	add|rm|check)
