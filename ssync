@@ -326,15 +326,15 @@ function sync_status {
 	cd "$syncrepo"
 	changes="$(git --no-pager diff "$linkindex" | grep -E "^[+-]/.+$" | LC_ALL=C sort)"
 	if [[ -z "$changes" ]]; then
-		if [[ ! -z "$(git status --porcelain)" ]]; then
-			echo "There are uncommitted file changes. (for details: ssync git status)"
-			return 1
-		elif ! is_repo_clean; then
+		if is_repo_clean; then
+			echo "No uncommitted changes."
+			return 0
+		elif [[ "$(git status --porcelain)" =~ ^.." $linkindex"$ ]]; then
 			echo "There are uncommitted permission changes but no file changes."
 			return 1
 		else
-			echo "No uncommitted changes."
-			return 0
+			echo "There are uncommitted file changes. (for details: ssync git status)"
+			return 1
 		fi
 	else
 		echo -e "Links have changed:\n$changes"
