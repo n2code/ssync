@@ -201,11 +201,11 @@ function remove_from_index {
 }
 
 function is_child_of {
-	local child parent reduced
+	local child="$1" parent="$2" reduced
 
 	#resolve links
-	child="$(readlink -m "$1")"
-	parent="$(readlink -m "$2")"
+	child="$(readlink -m "$child")"
+	parent="$(readlink -m "$parent")"
 	
 	#strip repo if currently synced
 	child="${child##"$syncrepo/files"}"
@@ -220,7 +220,25 @@ function is_in_repo {
 	local tested="$1" line
 
 	while read line; do
-		if [[ "$tested" == "$line" ]] || is_child_of "$tested" "$line"; then return 0; fi
+		if [[ "$tested" == "$line" ]]; then
+			echo "In repository index: $tested" >&9
+			return 0
+		elif is_child_of "$tested" "$line"; then
+			echo "Parent in repository: $line" >&9
+			return 0
+		fi
+	done <"$syncrepo/$linkindex"
+	return 1
+}
+
+function has_child_in_repo {
+	local parent="$1" line
+
+	while read line; do
+		if is_child_of "$line" "$parent"; then
+			echo "Child in repository: $line" >&9
+			return 0
+		fi
 	done <"$syncrepo/$linkindex"
 	return 1
 }
@@ -242,6 +260,8 @@ function sync_add {
 
 	if is_in_repo "$passed"; then
 		errecho "ERROR, already part of repository $syncrepo"
+	elif has_child_in_repo "$passed"; then
+		errecho "ERROR, child path already in repo"
 	elif [[ -L "$passed" ]]; then
 		errecho "ERROR, symlinks cannot be synced"
 	elif [[ -e "$passed" && ( -d "$passed" || -f "$passed" ) ]]; then
