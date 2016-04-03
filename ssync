@@ -354,10 +354,13 @@ function save_permissions {
 	local line hit
 
 	if [[ ! -e "$syncrepo/files" ]]; then return 0; fi
+	cd "$syncrepo"
 	while read -u 3 line; do
-		hit="${line##"$syncrepo/files"}"
-		if is_in_repo "$hit" 9>/dev/null; then
-			echo "$(stat --printf="%04a:%U:%G" "$line"):$hit"
+		if ! git check-ignore --quiet "$line"; then
+			hit="${line##"$syncrepo/files"}"
+			if is_in_repo "$hit" 9>/dev/null; then
+				echo "$(stat --printf="%04a:%U:%G" "$line"):$hit"
+			fi
 		fi
 	done 3< <(find "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
 }
