@@ -284,7 +284,7 @@ function sync_commit {
 	save_permissions
 	git add --all
 
-	msg="System update: $( git diff --staged --stat | tail -n1 )"
+	msg="ssync: $( git diff --staged --stat | tail -n1 )"
 	if [[ ! -z "$1" ]]; then msg="$1"; fi
 	git commit -m "$msg"
 }
@@ -415,7 +415,7 @@ function sync_fix {
 }
 
 function sync_log {
-	cd "$syncrepo" && git log --graph --abbrev-commit --decorate --date-order --date=relative --format=format:'%C(bold blue)%h %C(bold green)(%ar) %C(bold yellow)%d %C(white)%s %C(dim white)- %an%C(reset)' --all
+	cd "$syncrepo" && git log --graph --abbrev-commit --decorate --date-order --date=relative --format=format:'%C(bold blue)%h %C(bold green)(%ar) %C(bold yellow)%d %C(white)%s %C(dim white)[%an]%C(reset)' --all
 }
 
 function is_repo_clean {
