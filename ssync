@@ -353,19 +353,19 @@ function save_permissions {
 	local line hit
 
 	if [[ ! -e "$syncrepo/files" ]]; then return 0; fi
-	while read line; do
+	while read -u 3 line; do
 		hit="${line##"$syncrepo/files"}"
-		if is_in_repo "$hit"; then
+		if is_in_repo "$hit" 9>/dev/null; then
 			echo "$(stat --printf="%04a:%U:%G" "$line"):$hit"
 		fi
-	done < <(find "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
+	done 3< <(find "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
 }
 
 function restore_permissions {
 	local mod user group location
 
 	echo "Adjusting permissions..."
-	while IFS=: read -r mod user group location; do
+	while IFS=: read -u 3 -r mod user group location; do
 		location="$syncrepo/files$location"
 		if [[ -e "$location" ]]; then
 			if [[ "$user:$group" != "$(stat --printf="%U:%G" "$location")" ]]; then
@@ -377,7 +377,7 @@ function restore_permissions {
 		else
 			errecho "$location not found, permission restore failed."
 		fi
-	done < "$syncrepo/$permfile"
+	done 3< "$syncrepo/$permfile"
 }
 
 function ask_confirm {
@@ -398,7 +398,7 @@ function sync_fix {
 	local location target reallocation problems=0
 
 	echo "Checking local repository against index..."
-	while read -u 3 location; do
+	while read -u 4 location; do
 		target="$syncrepo/files$location"
 		echo -n "$location => " >&9
 		if [[ -L "$location" ]]; then
@@ -428,7 +428,7 @@ function sync_fix {
 			&& add_clone_link "$target" "$location" \
 			|| { errecho "Adding link failed."; ((problems++)); }
 		fi
-	done 3<"$syncrepo/$linkindex"
+	done 4<"$syncrepo/$linkindex"
 
 	restore_permissions
 
