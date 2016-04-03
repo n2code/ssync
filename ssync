@@ -151,7 +151,9 @@ function sync_setup {
 		git config user.signingkey "$gpgkey"
 		git config commit.gpgsign true
 	fi
+	gpg_check "origin/$syncbranch"
 	git checkout "$syncbranch"
+	git branch -u "origin/$syncbranch"
 	git branch "$machinebranch"
 	git checkout "$machinebranch"
 	gpg_check "$machinebranch"
@@ -321,6 +323,7 @@ function sync_check {
 function save_permissions {
 	local line hit
 
+	if [[ ! -e "$syncrepo/files" ]]; then return 0; fi
 	while read line; do
 		hit="${line##"$syncrepo/files"}"
 		if is_in_repo "$hit"; then
@@ -399,8 +402,10 @@ function sync_fix {
 
 	if (( $problems > 0 )); then
 		errecho "[!] WARNING: $problems problem(s) unresolved and remaining. Re-run \"ssync fix\" to check again."
+		return 1
 	else
 		echo "[i] Repository state clean."
+		return 0
 	fi
 }
 
@@ -436,7 +441,8 @@ function sync_update {
 		&& check_repo_clean \
 		&& git checkout "$machinebranch" \
 		&& gpg_check "$machinebranch" \
-		&& gpg_check "$syncbranch" \
+		&& gpg_check "origin/$syncbranch" \
+		&& git branch -f "$syncbranch" "origin/$syncbranch" \
 		&& { git merge --ff $verify "$syncbranch" && echo "[i] Updated from central repository." && return 0; } \
 		|| { errecho "[!] Merge needs manual intervention. Do so and run: ssync commit" && return 1; }
 	fi
@@ -513,9 +519,10 @@ case "$mainarg" in
 		case "$1" in
 			override)
 				shift
-				;&
-			diff|log|shortlog|show|status)
 				git "$@"
+				;;
+			diff|log|shortlog|show|status)
+				cd "$syncrepo" && git "$@"
 				;;
 			*)
 				errecho "AVOID THESE GIT COMMANDS TO KEEP SSYNC WORKING PROPERLY.\nUse the designated ssync commands instead:"
