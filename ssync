@@ -87,10 +87,12 @@ function gpg_check {
 	local testedref="$1"
 
 	if gpg_enabled; then
-		echo "GPG check for $testedref..."
-		if ! git verify-commit "$testedref" 2>&1; then
-			errecho "########## GPG TRUST FAIL! ##########"
+		echo -n "GPG check for $testedref... "
+		if ! git verify-commit "$testedref" 2>&9; then
+			errecho "\n########## GPG TRUST FAIL! ##########"
 			exit 1
+		else
+			echo "ok"
 		fi
 	fi
 	return 0
@@ -398,7 +400,8 @@ function sync_fix {
 			else ((problems++)); fi
 		else
 			echo "adding..." >&9
-			add_clone_link "$target" "$location" \
+			echo "Restoring missing link: $location" \
+			&& add_clone_link "$target" "$location" \
 			|| { errecho "Adding link failed."; ((problems++)); }
 		fi
 	done 3<"$syncrepo/$linkindex"
@@ -444,10 +447,10 @@ function sync_update {
 		cd "$syncrepo" \
 		&& git fetch origin \
 		&& check_repo_clean \
-		&& git checkout "$machinebranch" \
+		&& git checkout --quiet "$machinebranch" \
 		&& gpg_check "$machinebranch" \
 		&& gpg_check "origin/$syncbranch" \
-		&& git branch -f "$syncbranch" "origin/$syncbranch" \
+		&& git branch --quiet -f "$syncbranch" "origin/$syncbranch" \
 		&& { git merge --ff $verify "$syncbranch" && echo "[i] Updated from central repository." && return 0; } \
 		|| { errecho "[!] Merge needs manual intervention. Do so and run: ssync commit" && return 1; }
 	fi
