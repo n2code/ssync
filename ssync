@@ -249,8 +249,6 @@ function add_clone_link {
 	mkdir -p "$(dirname "$link")"
 	{ echo -n "Creating link: " >&9 \
 	&& ln --symbolic --verbose -- "$original" "$link" >&9 \
-	&& chown --no-dereference --reference="$original" --verbose -- "$link" >&9 \
-	&& chmod --reference="$original" --changes -- "$link" >&9 \
 	&& return 0; } || return 1
 }
 
@@ -276,6 +274,8 @@ function sync_add {
 		&& rm --recursive --verbose -- "$passed" >&9 \
 		&& echo "Relinking former location..." >&9 \
 		&& add_clone_link "$target" "$passed" \
+		&& chown --no-dereference --reference="$target" --verbose -- "$passed" >&9 \
+		&& chmod --reference="$target" --changes -- "$passed" >&9 \
 		&& add_to_index "$syncrepo/$linkindex" "$passed" \
 		&& echo "$successmessage" >&9
 	else
