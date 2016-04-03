@@ -329,7 +329,7 @@ function sync_status {
 		if is_repo_clean; then
 			echo "No uncommitted changes."
 			return 0
-		elif [[ "$(git status --porcelain)" =~ ^.." $linkindex"$ ]]; then
+		elif [[ "$(git status --porcelain)" =~ ^.." $permfile"$ ]]; then
 			echo "There are uncommitted permission changes but no file changes."
 			return 1
 		else
