@@ -353,13 +353,15 @@ function restore_permissions {
 
 function ask_confirm {
 	local message="$1" answer
+
 	while [[ ! "$answer" =~ ^[yYnN]$ ]]; do
-		if ! read -r -n 1 -p "$message [y/n]: " -t 99 answer; then
+		if ! read -r -n 1 -p "$message [y/n]: " -t 99 answer < /dev/tty; then
 			answer="n"
 			echo -n "$answer (chosen by timeout)"
 		fi
 		echo
 	done
+
 	if [[ "$answer" =~ ^[yY]$ ]]; then return 0; else return 1; fi
 }
 
@@ -380,21 +382,21 @@ function sync_fix {
 				if ask_confirm "Delete existing symlink and link to repository instead?"; then
 					( rm -- "$location" \
 					&& add_clone_link "$target" "$location" ) \
-					|| ( errecho "Correcting link failed." && ((problems++)) )
+					|| { errecho "Correcting link failed."; ((problems++)); }
 				else ((problems++)); fi
 			fi
 		elif [[ -e "$location" ]]; then
 			echo "CONTENT CONFLICT!" >&9
 			errecho "Symlink to repository expected but file/folder found: $location"
 			if ask_confirm "Delete existing file/folder and link to repository instead?"; then
-				( rm -i -- "$location" && [[ ! -e "$location" ]] \
+				( rm -r -i -- "$location" < /dev/tty && [[ ! -e "$location" ]] \
 				&& add_clone_link "$target" "$location" ) \
-				|| ( errecho "Linking failed." && ((problems++)) )
+				|| { errecho "Linking failed."; ((problems++)); }
 			else ((problems++)); fi
 		else
 			echo "adding..." >&9
 			add_clone_link "$target" "$location" \
-			|| ( errecho "Adding link failed." && ((problems++)) )
+			|| { errecho "Adding link failed."; ((problems++)); }
 		fi
 	done 3<"$syncrepo/$linkindex"
 
