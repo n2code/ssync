@@ -359,7 +359,7 @@ function save_permissions {
 		if ! git check-ignore --quiet "$line"; then
 			hit="${line##"$syncrepo/files"}"
 			if is_in_repo "$hit" 9>/dev/null; then
-				echo "$(stat --printf="%04a:%U:%G" "$line"):$hit"
+				echo "$(stat --dereference --printf="%04a:%U:%G" "$line"):$hit"
 			fi
 		fi
 	done 3< <(find "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
@@ -373,7 +373,7 @@ function restore_permissions {
 		location="$syncrepo/files$location"
 		if [[ -e "$location" ]]; then
 			if [[ "$user:$group" != "$(stat --printf="%U:%G" "$location")" ]]; then
-				chown --changes -- "$user:$group" "$location" >&9
+				chown --dereference --changes -- "$user:$group" "$location" >&9
 			fi
 			if [[ "$mod" != "$(stat --printf="%04a" "$location")" ]]; then
 				chmod --changes "$mod" "$location" >&9
@@ -413,7 +413,7 @@ function sync_fix {
 				echo "LINK CONFLICT!" >&9
 				errecho "The indexed symlink is not pointing to the repository as expected: $location"
 				if ask_confirm "Delete existing symlink and link to repository instead?"; then
-					( rm -- "$location" \
+					( rm -- "$location" && [[ ! -e "$location" ]] \
 					&& add_clone_link "$target" "$location" ) \
 					|| { errecho "Correcting link failed."; ((problems++)); }
 				else ((problems++)); fi
