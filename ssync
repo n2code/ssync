@@ -63,6 +63,9 @@ COMMANDS:
     commit [MESSAGE]
           Bundle changes in a commit for synchronization.
 
+    reset
+          Discard all uncommitted changes.
+
     update
           Fetch latest changes from central repository and merge them.
 
@@ -73,7 +76,7 @@ COMMANDS:
           List paths of all repository elements.
 
     uninstall
-          Restore (see \"rm\" command) all contents and deletes local repository.
+          Restore (see \"rm\" command) all contents and delete local repository.
 
     git ...
           Pipe git command through to underlying git."
