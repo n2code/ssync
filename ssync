@@ -626,8 +626,9 @@ function sync_update {
 		&& gpg_check "$machinebranch" \
 		&& gpg_check "origin/$syncbranch" \
 		&& git branch --quiet -f "$syncbranch" "origin/$syncbranch" \
-		&& { git merge --ff $verify "$syncbranch" && echo "[i] Updated from central repository." && return 0; } \
-		|| { errecho "[!] Merge needs manual intervention. Do so and run: ssync commit" && return 1; }
+		&& { git merge --ff $verify "$syncbranch" && echo "[i] Updated from central repository." && return 0 \
+		     || { errecho "[!] Merge needs manual intervention. Do so and run: ssync commit" && return 1; }; } \
+		|| { errecho "[!] Update failed." && return 1; }
 	fi
 }
 
