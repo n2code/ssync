@@ -280,10 +280,12 @@ function sync_add {
 		&& chown --no-dereference --reference="$target" --verbose -- "$passed" >&9 \
 		&& chmod --reference="$target" --changes -- "$passed" >&9 \
 		&& add_to_index "$syncrepo/$linkindex" "$passed" \
-		&& echo "$successmessage" >&9
+		&& echo "$successmessage" >&9 \
+		&& return 0
 	else
 		errecho "ERROR, source directory or file not found"
 	fi
+	return 1
 }
 
 function sync_rm {
@@ -301,8 +303,10 @@ function sync_rm {
 		&& rsync --recursive --links --perms --times --group --owner --relative --devices --specials --verbose "$syncrepo/files/.$passed" "/" >&9 \
 		&& rm -r --verbose "$repodata" >&9 \
 		&& remove_from_index "$syncrepo/$linkindex" "$passed" \
-		&& echo "Restored at original location." >&9
+		&& echo "Restored at original location." >&9 \
+		&& return 0
 	fi
+	return 1
 }
 
 function sync_commit {
@@ -348,8 +352,10 @@ function sync_status {
 function sync_check {
 	if is_in_repo "$1"; then
 		echo "In ssync repository."
+		return 0
 	else
 		echo "Not in repository."
+		return 1
 	fi
 }
 
@@ -438,7 +444,6 @@ function sync_fix {
 	done 4<"$syncrepo/$linkindex"
 
 	restore_permissions
-
 	if (( $problems > 0 )); then
 		errecho "[!] WARNING: $problems problem(s) unresolved and remaining. Re-run \"ssync fix\" to check again."
 		return 1
@@ -508,9 +513,11 @@ function sync_uninstall {
 			errecho "\n[!] Something went wrong. Aborting uninstall."
 		else
 			rm -r "$syncrepo" \
-			&& echo "[i] Uninstall successful."
+			&& echo "[i] Uninstall successful." \
+			&& return 0
 		fi
 	fi
+	return 1
 }
 
 function check_branch {
@@ -545,11 +552,13 @@ function sync_reset {
 			echo "Resetting git..."
 			git reset --hard "$machinebranch" \
 			&& git checkout --quiet "$machinebranch" \
-			&& echo "[i] Resetted to committed state."
+			&& echo "[i] Resetted to committed state." \
+			&& return 0
 		else
 			errecho "[!] Reset not completed. Try again."
 		fi
 	fi
+	return 1
 }
 
 
@@ -579,6 +588,8 @@ case "$mainarg" in
 	fix)
 		sync_fix;;
 	add|rm|check)
+		let c_ok=0 c_fail=0
+
 		while : ; do
 			#calculate resolved non-repo path
 			fullpath="$(realpath --quiet --canonicalize-missing --no-symlinks "$1")"
@@ -594,9 +605,18 @@ case "$mainarg" in
 				rm) sync_rm "$fullpath";;
 				check) sync_check "$fullpath";;
 			esac
+			if [[ "$?" != "0" ]]; then ((c_fail++)); else ((c_ok++)); fi
 			shift
 			[[ "$1" ]] || break
 		done
+
+		if [[ "$mainarg" != "check" ]]; then
+			if ((c_ok + c_fail > 1 && c_fail > 0)); then
+				errecho "[!] Multiple files given: $c_ok ok, $c_fail failed"
+			fi
+		fi
+
+		((c_fail == 0))
 		;;
 	commit)
 		sync_commit "$1";;
@@ -629,8 +649,10 @@ case "$mainarg" in
 				;;
 		esac
 		;;
-	*)
+	help)
 		usagehelp;;
+	*)
+		usagehelp && exit 1;;
 esac
 
 #End Of Script :)
