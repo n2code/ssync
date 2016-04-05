@@ -416,7 +416,7 @@ function check_branch {
 	#makes sure given branch is checked out
 	local expectedbranch="$1"
 
-	if [[ "$(git symbolic-ref --short --quiet HEAD)" == "$expectedbranch" ]]; then
+	if [[ "$(cd "$syncrepo" && git symbolic-ref --short --quiet HEAD)" == "$expectedbranch" ]]; then
 		return 0
 	else
 		errecho "[!] Aborting operation. Not on branch $expectedbranch as expected."
