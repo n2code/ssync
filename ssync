@@ -367,10 +367,11 @@ function save_permissions {
 			#make absolutely sure that this file is wanted
 			#probably not necessary at this point, tbh...
 			if is_in_repo "$hit" 9>/dev/null; then
-				echo "$(stat --dereference --printf="%04a:%U:%G" "$line"):$hit"
+				#no dereferencing to get versioned symlinks' permissions as well
+				echo "$(stat --printf="%04a:%U:%G" "$line"):$hit"
 			fi
 		fi
-	done 3< <(find "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
+	done 3< <(find -P "$syncrepo/files" -mindepth 1 | LC_ALL=C sort) > "$syncrepo/$permfile"
 }
 
 function restore_permissions {
@@ -379,13 +380,19 @@ function restore_permissions {
 
 	echo "Adjusting permissions..."
 	while IFS=: read -u 3 -r mod user group location; do
+		virtuallocation="$location"
 		location="$syncrepo/files$location"
-		if [[ -e "$location" ]]; then
-			#only change owner/permissions if they differ
+		if [[ -L "$location" || -e "$location" ]]; then
+			#change ownership if values differ
 			if [[ "$user:$group" != "$(stat --printf="%U:%G" "$location")" ]]; then
-				chown --dereference --changes -- "$user:$group" "$location" >&9
+				chown --no-dereference --changes -- "$user:$group" "$location" >&9
+				#adjust link to repo
+				if is_indexed "$syncrepo/$linkindex" "$virtuallocation"; then
+					chown --no-dereference --changes -- "$user:$group" "$virtuallocation" >&9
+				fi
 			fi
-			if [[ "$mod" != "$(stat --printf="%04a" "$location")" ]]; then
+			#change permissions if they differ and not a symlink (link permissions cannot be changed)
+			if [[ ! -L "$location" && "$mod" != "$(stat --printf="%04a" "$location")" ]]; then
 				chmod --changes "$mod" "$location" >&9
 			fi
 		else
