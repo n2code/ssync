@@ -125,7 +125,7 @@ function errecho {
 
 function assert_root {
 	#make sure user is root unless help or simple querying commands are called
-	if [[ $EUID -ne 0 ]] && ! [[ "$mainarg" =~ ^help|check|status|log$ ]]; then
+	if [[ $EUID -ne 0 ]] && ! [[ "$mainarg" =~ ^help|check|status|log|links$ ]]; then
 		errecho "This must be run as root."
 		exit 1
 	fi
