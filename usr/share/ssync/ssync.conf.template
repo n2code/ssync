@@ -1,6 +1,4 @@
 #SSYNC CONFIGURATION
-##Leave empty to prevent creating a link in /usr/local/bin
-programlink="ssync"
 ##Local repository
 syncrepo="/systemsync/repo"
 gituser="user"

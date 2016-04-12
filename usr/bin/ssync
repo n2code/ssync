@@ -17,17 +17,16 @@ shift
 #root is required for almost all commands
 assert_root
 
-#get script dir to locate settings
-script="${BASH_SOURCE[0]}"
-callname="$( basename "$script" )"
-if [[ -L "$script" ]]; then script="$( readlink -ms "$script" )"; fi
-dir="$( dirname "$script" )"
+callname="$( basename "${BASH_SOURCE[0]}" )"
+script_path="/usr/bin/ssync"
+config_path="/etc/ssync.conf"
+config_template_path="/usr/share/ssync/ssync.conf.template"
 
-#check settings or offer template
+#check config file or offer template
 check_properly_configured
 
-#settings valid, load them!
-source "$dir/settings.inc"
+#config valid, load them!
+source "$config_path"
 permfile="ssync-file-permissions"
 linkindex="ssync-linkindex"
 
@@ -132,11 +131,11 @@ function assert_root {
 }
 
 function check_properly_configured {
-	#look if settings file exists and differs from template, otherwise copy it and display explanation
-	if ( test ! -f "$dir/settings.inc" ) || ( cmp -s "$dir/settings.inc.template" "$dir/settings.inc" >/dev/null ); then
-		cp "$dir/settings.inc.template" "$dir/settings.inc"
+	#look if config file exists and differs from template, otherwise copy it and display explanation
+	if ( test ! -f "$config_path" ) || ( cmp -s "$config_template_path" "$config_path" >/dev/null ); then
+		cp "$config_template_path" "$config_path"
 		echo "Welcome to ssync!
- A default configuration was copied to $dir/settings.inc
+ A default configuration was copied to $config_path
  Edit this file and restart this setup by using
      ssync setup
  to pull the ssync repository from GITURL or even
@@ -171,7 +170,7 @@ USAGE: $callname [verbose] COMMAND
 
 COMMANDS:
     setup [new]
-          Initializes ssync. If settings file is not found a template is created
+          Initializes ssync. If config file is not found a template is created
           and the user is prompted to edit it and execute this command again.
           Adding the \"new\" option creates the necessary repository structures
           and pushes them to an empty git repository with the specified GITURL,
@@ -234,7 +233,7 @@ function ask_confirm {
 ##############################################################
 
 function is_gpg_enabled {
-	#is gpgkey configured in settings file?
+	#is gpgkey configured in config file?
 	if [[ ! -z "$gpgkey" ]]; then return 0; else return 1; fi
 }
 
@@ -460,11 +459,11 @@ function sync_setup {
 		git push -u central "$syncbranch" || { errecho "Upload failed, aborting setup." && exit 1; }
 
 		rm -r "$temprepo"
+		cd "/"
 	fi
 
 	echo "SYSTEMSYNC-SETUP"
 	echo "################"
-	cd "$dir"
 
 	echo "Cloning sync repository..."
 	if ! git clone --origin origin "$giturl" "$syncrepo"; then
@@ -472,17 +471,10 @@ function sync_setup {
 	fi
 
 	echo "Setting up hooks..."
-	#these hooks trigger ssync fix on every working tree update which updates permissions and local files
-	echo -e "#!/bin/bash\n$dir/ssync fix" > "$syncrepo/.git/hooks/post-checkout"
+	#these hooks trigger ssync fix on every working tree update which updates permissions and local files/links
+	echo -e "#!/bin/bash\n$script_path fix" > "$syncrepo/.git/hooks/post-checkout"
 	chmod u+x "$syncrepo/.git/hooks/post-checkout"
 	cp "$syncrepo/.git/hooks/post-checkout" "$syncrepo/.git/hooks/post-merge"
-
-	#if configured this creates an alias for ssync
-	if [[ ! -z "$programlink" ]]; then
-		echo "(Re)Linking in /usr/local/bin as $programlink..."
-		rm "/usr/local/bin/$programlink" 2> /dev/null
-		ln -s "$dir/ssync" "/usr/local/bin/$programlink"
-	fi
 
 	echo "Setting up local repository..."
 
@@ -709,7 +701,7 @@ function sync_uninstall {
 	echo "This will restore all the content that is currently controlled by ssync and delete the local repository ($syncrepo)."
 	if ask_confirm "Are you ABSOLUTELY sure you want to do this?" && ask_confirm "Seriously, you understand the consequences and want to proceed?"; then
 		if [[ -s "$syncrepo/$linkindex" ]]; then
-			"$dir/ssync" verbose rm $(cat "$syncrepo/$linkindex")
+			"$script_path" verbose rm $(cat "$syncrepo/$linkindex")
 		fi
 		if [[ -s "$syncrepo/$linkindex" ]]; then
 			errecho "\n[!] Something went wrong. Aborting uninstall."
@@ -732,11 +724,11 @@ function sync_reset {
 		#Undo ssync add/rm since last commit
 		if [[ ! -z "$added"   ]]; then
 			echo -e "Added since commit:\n$added\nRestoring..."
-			"$dir/ssync" rm  $added
+			"$script_path" rm  $added
 		fi
 		if [[ ! -z "$removed" ]]; then
 			echo -e "Removed since commit:\n$removed\nRelinking..."
-			"$dir/ssync" add $removed
+			"$script_path" add $removed
 		fi
 
 		#If correctly undone reset git
