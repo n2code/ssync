@@ -32,7 +32,6 @@ linkindex="ssync-linkindex"
 
 #if setup complete check proper access
 check_setup
-check_branch "$machinebranch"
 
 #alright, let's get to work and process the ssync command
 case "$mainarg" in
@@ -162,6 +161,8 @@ function check_setup {
 		errecho "ERROR: No valid ssync repository in $syncrepo\n$permfile or $linkindex missing."
 		exit 1
 	fi
+
+	check_branch "$machinebranch"
 }
 
 function helphint {
@@ -545,7 +546,6 @@ function sync_add {
 
 function sync_rm {
 	local passed="$1" repodata
-
 	repodata="$syncrepo/files$passed"
 
 	if ! is_indexed "$syncrepo/$linkindex" "$passed"; then
