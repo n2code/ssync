@@ -137,10 +137,11 @@ function check_properly_configured {
 		echo "Welcome to ssync!
  A default configuration was copied to $config_path
  Edit this file and restart this setup by using
-     ssync setup
- to pull the ssync repository from GITURL or even
      ssync setup new
- for first use of this tool ever (this initializes a fresh repo and pushes it upstream)."
+ for a first time installation.
+ This initializes a fresh repo and pushes it upstream. Otherwise use
+     ssync setup
+ for subsequent installations - this will only pull from GITURL."
 	exit 1
 	fi
 }
