@@ -1,17 +1,16 @@
-#!/bin/bash
-########## SSYNC CONFIGURATION ######### 
-### This file will be sourced.       ###
-### Please use only absolute paths.  ###
+########### SSYNC CONFIGURATION ##########
+### This file will be sourced by bash. ###
+### Please use only absolute paths.    ###
 
-#Local repository
-syncrepo="/systemsync/repo"
-gituser="computer1"
-gitemail="user@localhost"
-machinebranch="computer1"
+# Local repository
+syncrepo="/var/lib/ssync"
+gituser="git author name here"
+gitemail="your.name@example.org"
+machinebranch="custom_branch_name_here"
 
-#Central repository location and master branch
-giturl="https://localhost/systemsync.git"
+# Central repository location and master branch
+giturl="remote_repository_url_here"
 syncbranch="master"
 
-#Security - leave empty to disable commit signing & signature checks
-gpgkey="A1B2C3D4"
+# Security - uncomment to enable commit signing & signature checks
+#gpgkey="A1B2C3D4"
