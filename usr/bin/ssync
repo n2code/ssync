@@ -32,6 +32,7 @@ linkindex="ssync-linkindex"
 
 #if setup complete check proper access
 check_setup
+check_branch "$machinebranch"
 
 #alright, let's get to work and process the ssync command
 case "$mainarg" in
@@ -153,11 +154,14 @@ function check_setup {
 
 	#setup is complete if local git repo exists
 	if ! [[ -e "$syncrepo/.git" ]]; then
-		errecho "ERROR: Setup not completed."
+		errecho "ERROR: Setup not completed.\nNo repository found in $syncrepo"
 		helphint && exit 1
 	fi
 
-	check_branch "$machinebranch"
+	if ! [[ -e "$syncrepo/$permfile" && -e "$syncrepo/$linkindex" ]]; then
+		errecho "ERROR: No valid ssync repository in $syncrepo\n$permfile or $linkindex missing."
+		exit 1
+	fi
 }
 
 function helphint {
@@ -469,6 +473,8 @@ function sync_setup {
 	if ! git clone --origin origin "$giturl" "$syncrepo"; then
 		errecho "CLONE FAILED." && exit 1
 	fi
+
+	check_setup
 
 	echo "Setting up hooks..."
 	#these hooks trigger ssync fix on every working tree update which updates permissions and local files/links
