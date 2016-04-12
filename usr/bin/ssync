@@ -1,4 +1,9 @@
 #!/bin/bash
+#######################################################
+# ssync - a symlinking git wrapper for [config] files #
+# URL: https://github.com/n2code/ssync                #
+# Licensed under the terms of the MIT license.        #
+#######################################################
 
 function main {
 
