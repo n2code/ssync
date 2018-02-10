@@ -5,6 +5,14 @@
 # Licensed under the terms of the MIT license.        #
 #######################################################
 
+#check system requirements
+startup_fails=0
+programs="bash git rsync"
+for program in $programs; do
+	command -v $program >/dev/null 2>&1 || { echo "ssync requires $program, please install it." 1>&2; ((startup_fails++)); }
+done
+[[ $startup_fails -eq 0 ]] || { echo "[!] Requirements for running ssync not fulfilled." 1>&2; exit 1; }
+
 function main {
 
 #file descriptor #9 is our verbose output, all superfluous information goes there
