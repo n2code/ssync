@@ -18,11 +18,15 @@ fi
 #ssync command
 mainarg="$1"
 shift
+callname="$( basename "${BASH_SOURCE[0]}" )"
+
+if [[ "$mainarg" =~ ^help|-h|--help$ ]]; then
+	usagehelp && exit 0
+fi
 
 #root is required for almost all commands
 assert_root
 
-callname="$( basename "${BASH_SOURCE[0]}" )"
 script_path="/usr/bin/ssync"
 config_path="/etc/ssync.conf"
 config_template_path="/usr/share/ssync/ssync.conf.template"
@@ -110,8 +114,6 @@ case "$mainarg" in
 				;;
 		esac
 		;;
-	help)
-		usagehelp;;
 	*)
 		usagehelp && exit 1;;
 esac
@@ -127,9 +129,13 @@ function errecho {
 	echo -e "$1" 1>&2
 }
 
+function is_root {
+	[[ $EUID -eq 0 ]]
+}
+
 function assert_root {
-	#make sure user is root unless help or simple querying commands are called
-	if [[ $EUID -ne 0 ]] && ! [[ "$mainarg" =~ ^help|check|status|log|links$ ]]; then
+	#make sure user is root unless simple querying commands are called
+	if ! is_root && ! [[ "$mainarg" =~ ^check|status|log|links$ ]]; then
 		errecho "This must be run as root."
 		exit 1
 	fi
@@ -138,8 +144,8 @@ function assert_root {
 function check_properly_configured {
 	#look if config file exists and differs from template, otherwise copy it and display explanation
 	if ( test ! -f "$config_path" ) || ( cmp -s "$config_template_path" "$config_path" >/dev/null ); then
-		cp "$config_template_path" "$config_path"
-		echo "Welcome to ssync!
+		if cp "$config_template_path" "$config_path"; then
+			echo "Welcome to ssync!
  A default configuration was copied to $config_path
  Edit this file and restart this setup by using
      ssync setup new
@@ -147,13 +153,17 @@ function check_properly_configured {
  This initializes a fresh repo and pushes it upstream. Otherwise use
      ssync setup
  for subsequent installations - this will only pull from GITURL."
+		else
+			echo "Unable to copy default configuration to $config_path"
+			assert_root
+		fi
 	exit 1
 	fi
 }
 
 function check_setup {
-	if [[ "$mainarg" =~ ^help|setup$ ]]; then
-		#calling help or setup does not require setup
+	if [[ "$mainarg" == "setup" ]]; then
+		#calling setup does not require setup
 		return 0
 	fi
 
@@ -176,8 +186,9 @@ function helphint {
 }
 
 function usagehelp () {
-	echo "
-USAGE: $callname [verbose] COMMAND
+	echo "USAGE: $callname [verbose] COMMAND
+
+ssync (system sync) is a symlinking git wrapper for [config] files.
 
 COMMANDS:
     setup [new]
