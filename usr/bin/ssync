@@ -247,7 +247,7 @@ function ask_confirm {
 	local message="$1" answer
 
 	while [[ ! "$answer" =~ ^[yYnN]$ ]]; do
-		if ! read -r -n 1 -p "$message [y/n]: " -t 99 answer < /dev/tty; then
+		if ! read -r -n 1 -p "$message [y/n]: " -t 30 answer < /dev/tty; then
 			answer="n"
 			echo -n "$answer (chosen by timeout)"
 		fi
