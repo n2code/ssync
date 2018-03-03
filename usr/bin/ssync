@@ -367,14 +367,28 @@ function has_child_in_repo {
 	return 1
 }
 
+function mkdir_p_confirm_inheritance {
+	local dir="$1"
+	local parent="$(dirname "$dir")"
+	if [[ ! -e "$parent" ]]; then
+		mkdir_p_confirm_inheritance "$parent" || return 1
+	fi
+	if [[ ! -d "$dir" ]]; then
+		mkdir -v "$dir" >&9 || return 1
+		if ask_confirm "Inherit ownership and mode for newly created directory $dir from parent?"; then
+			chown --changes -- "$(stat --printf="%U:%G" "$parent")" "$dir" >&9 \
+			&& chmod --changes "$(stat --printf="%04a" "$parent")" "$dir" >&9
+		fi
+	fi
+}
+
 function add_clone_link {
 	#creates a repo-pointing link (and necessary parent directories)
 	local original="$1" link="$2"
 
-	mkdir -p "$(dirname "$link")"
-	{ echo -n "Creating link: " >&9 \
-	&& ln --symbolic --verbose -- "$original" "$link" >&9 \
-	&& return 0; } || return 1
+	echo -n "Creating link: " >&9 \
+	&& mkdir_p_confirm_inheritance "$(dirname "$link")" \
+	&& ln --symbolic --verbose -- "$original" "$link" >&9
 }
 
 function is_index_changed {
