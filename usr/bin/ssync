@@ -273,7 +273,7 @@ function gpg_check {
 
 	if is_gpg_enabled; then
 		echo -n "GPG check for $testedref... "
-		if ! git verify-commit "$testedref" 2>&9; then
+		if ! git verify-commit "$testedref" 2>&1; then
 			errecho "\n########## GPG TRUST FAIL! ##########"
 			exit 1
 		else
@@ -480,6 +480,7 @@ function check_branch {
 ##############################################################
 
 function sync_setup {
+	exec 9>&1
 	if [[ "$1" == "new" ]]; then
 		echo "SYSTEMSYNC-REPO-CREATION"
 		echo "########################"
